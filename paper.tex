@@ -1,0 +1,413 @@
+\documentclass[runningheads]{llncs}
+
+\usepackage{amsmath,amssymb,mathtools}
+\usepackage[hidelinks]{hyperref}
+\usepackage{booktabs}
+\usepackage{graphicx}
+
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Var}{\mathrm{Var}}
+\newcommand{\Prob}{\mathbb{P}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\dt}{\Delta t}
+\newcommand{\1}{\mathbf{1}}
+
+\title{Optimal Block Time for AMM\\ Liquidity Providers under Jump-Diffusion Prices}
+\titlerunning{Optimal Block Time under Jump-Diffusion}
+
+\author{Nils Bundi}
+\authorrunning{N. Bundi}
+\institute{Zurich University of Applied Sciences, Switzerland\\
+\email{bund@zhaw.ch}}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Loss-versus-Rebalancing (LVR) is the dominant adverse-\linebreak selection cost paid by liquidity providers on automated market makers. Previous research shows that under geometric Brownian motion and swap fee $\gamma$ the constant-product market maker (CPMM) LVR rate scales monotonically in $\sigma\sqrt{\dt}/\gamma$, motivating shorter blocks. I revisit this conclusion when prices jump. Modeling the reference price as a Merton jump-diffusion, I derive a closed-form decomposition of the LVR rate into a diffusion term $\sigma^2 V/8$ scaled by a fee/block-time multiplier $F(\gamma/(\sigma\sqrt{\dt}))$ and a jump term $\lambda V\cdot G(\gamma;m,\delta^2)$ that is invariant in $\dt$. The jump term is a strictly positive floor: as $\dt\to 0$ the LVR rate approaches $\lambda V G > 0$, never zero. I characterize an LP-side planner's optimum $\dt^{\mathrm{opt}}$ that turns out to be invariant in the jump parameters $(\lambda,m,\delta)$. Calibrating the model to Ethereum data, I find the $12$-second block-time to be mildly diffusion-dominated at baseline volatility. The diffusion share rises sharply in stress regimes and collapses in calm ones. Block-time reductions therefore deliver substantial LVR savings while the diffusion term dominates, with diminishing returns as the rate approaches the jump floor. Combining this with Ethereum consensus cost places the LP-side planner's optimum at $\dt^{\mathrm{opt}} \approx 7$~s --- roughly half Ethereum's block-time, but well above the sub-second regime of Solana and modern app-chains. LVR is, however, only one component of block-time welfare and a full treatment must additionally weigh MEV redistribution, finality, censorship resistance, and oracle freshness.
+
+\keywords{Automated market makers \and Loss-versus-Rebalancing \and Jump-diffusion \and Block time \and Decentralized finance \and Blockchain protocol design}
+\end{abstract}
+
+\section{Introduction}\label{sec:intro}
+
+Milionis et al.~\cite{milionis2022automated} formalize the adverse-selection cost of passive liquidity provision on a constant-function market maker (CFMM) as \emph{loss-versus-rebalancing} (LVR): the gap between a passive liquidity provider's (LP) mark-to-market return and the return of a continuously rebalanced portfolio holding the LP's instantaneous exposure. For a constant-product market maker (CPMM), a special case of the CFMM, with pool value $V(P)$ and external reference price $P_t$ following a GBM with volatility $\sigma$, the LVR rate equals $\sigma^2 V/8$. Hence, it is independent of the block-time, the rate at which arbitrageurs are able to re-align the pool. Milionis et al.~\cite{milionis2023automated} extend this to swap fees $\gamma$ and Poisson block arrivals of mean block-time $\dt$. In their low-fee fast-block regime, the LVR rate is multiplied by a strictly increasing function of $\sigma\sqrt{\dt}/\gamma$, so shorter blocks increase welfare.
+
+This GBM-based prescription---``shorten blocks to reduce LVR''---is the implicit case for sub-second block times now deployed on Solana, modern Ethereum L2s, and a host of app-chains. Empirically, however, crypto reference prices are not GBM but exhibit pronounced jumps \cite{scaillet2020high,chaim2019nonlinear,saef2024temporal}. A jump produces an instantaneous, $\dt$-independent price gap which is cleared in the very next block and the LP eats the concavity loss.
+
+This paper asks: \emph{what does the LVR/block-time relationship look like once prices jump?} I give three answers.
+
+\paragraph{Contributions.} For a CPMM under Merton jump-diffusion $(\mu,\sigma,\lambda,m,\delta)$, Theorem~\ref{thm:decomp} gives the additive zero-fee decomposition
+\begin{equation}\label{eq:headline}
+\ell \;=\; \tfrac{\sigma^2}{8}\,V \;+\; \tfrac{\lambda}{2}\,V \cdot \Big[e^{m+\delta^2/2} - 2 e^{m/2 + \delta^2/8} + 1\Big],
+\end{equation}
+in which both components are nonnegative and the jump component is block-time-invariant. Reintroducing a swap fee $\gamma$ and discrete block time $\dt$, Theorem~\ref{thm:fee} shows that, to the first order in the pool-curvature expansion,
+\begin{equation}\label{eq:headline-fee}
+\ell(\dt) \;=\; \tfrac{\sigma^2}{8}\,V \cdot F\!\left(\tfrac{\gamma}{\sigma\sqrt{\dt}}\right) \;+\; \lambda\,V \cdot G(\gamma; m, \delta^2),
+\end{equation}
+where $F:\R_+\to[0,1]$ is a fee multiplier and $G = \tfrac{1}{8}\E[(|J|-\gamma)^2\1\{|J|>\gamma\}] > 0$. Corollary~\ref{cor:floor} then yields $\lim_{\dt\to 0}\ell(\dt) = \lambda V G > 0$, an irreducible jump floor that fees cannot eliminate. Finally, embedding $\ell(\dt)$ in a welfare objective that nets LVR against pool-attributable block-production cost, Theorem~\ref{thm:planner} characterizes the LP-side planner's optimum as the unique root of an explicit first-order condition and shows that this optimum is invariant in the jump parameters $(\lambda,m,\delta)$: jumps shift the welfare level but not the planner's marginal tradeoff. The underlying step is a standard application of It\^o--L\'evy calculus to the LVR functional of Milionis et al.~\cite{milionis2022automated,milionis2023automated}. The contribution is the closed-form decomposition itself, the way the jump component constrains block-time policy as an irreducible floor, and the regime-dependent calibration that locates this constraint quantitatively.
+
+\paragraph{Organization.} Section~\ref{sec:related} positions the contribution relative to the LVR and jump-diffusion literatures, and Section~\ref{sec:model} fixes notation and the model primitives. The technical core builds in two stages: Section~\ref{sec:zerofees} derives the zero-fee LVR decomposition that isolates the diffusion and jump components, and Section~\ref{sec:fees} reintroduces swap fees and discrete blocks, recovering the additive structure with the fee multiplier acting on the diffusion term and the jump term unchanged. Section~\ref{sec:opt} solves the LP-side planner's problem and establishes the jump-parameter invariance of the optimum. Section~\ref{sec:numerics} illustrates the formulas at a representative parameter point with regime-sensitivity grids, and Section~\ref{sec:disc} discusses policy implications and limitations.
+
+\section{Related Work}\label{sec:related}
+
+CFMMs are the dominant trading mechanism in decentralized finance, with the CPMM invariant first deployed at scale by Uniswap. Angeris et al.~\cite{angeris2020improved} provide a foundational economic analysis of CPMMs, characterizing arbitrage equilibria, reserve dynamics, and the convergence of pool prices to external references under frictionless arbitrage. Milionis et al.~\cite{milionis2022automated} introduce \emph{loss-versus-rebalancing} (LVR) as a measure of LP underperformance against a continuously-rebalanced benchmark portfolio. Under GBM, they show that the LVR rate equals a quadratic-variation-style ``gamma'' term, with the full-range Uniswap-V2 specialization $\sigma^2 V/8$. The derivation isolates LVR as a measure-independent rate that does not depend on the LP's risk-neutral probability nor on hedging considerations, making it a natural protocol-level adverse-selection metric. Milionis et al.~\cite{milionis2023automated} extend the analysis to proportional fees with Poisson-arrival blocks, showing in their fast-block low-fee regime that the GBM LVR rate is multiplied by a strictly-decreasing function of $\gamma/(\sigma\sqrt{\dt})$ --- the first formal link between protocol-level block-time and LP loss. Fritsch and Canidio~\cite{fritsch2024measuring} empirically validate this scaling across major Uniswap pools. Cartea, Drissi, and Monga~\cite{cartea2023predictable} introduce \emph{predictable loss} (PL), the LP-loss counterpart to LVR framed in continuous-time wealth dynamics, and derive a closed-form optimal strategy for concentrated-liquidity LPs trading off PL against fee income and concentration risk. Capponi and Jia~\cite{capponi2024price} develop a game-theoretic model of LP deposit decisions, identifying a ``liquidity freeze'' regime where LPs withdraw when reference-price volatility outweighs fee revenue, and so provide micro-foundations for the loss channel that LVR measures in reduced form.
+
+On price-dynamics modelling, jump-diffusion has been a standard model in derivatives pricing since Merton~\cite{merton1976option}. Kou~\cite{kou2002jump} provides an asymmetric double-exponential alternative widely used in cryptocurrency modeling and Carr et al.~\cite{carr2002fine} introducing the Carr--Geman--Madan--Yor model, a four-parameter pure-jump L\'evy process with flexible tail behavior controlled by an additional fine-structure parameter. Cont and Tankov~\cite{cont2003financial} provides a comprehensive treatment of the technical machinery---It\^o--L\'evy calculus, compensator formulas for marked Poisson random measures, truncated-moment representations. Empirical jump detection in crypto markets has documented their pervasiveness and economic importance: Scaillet et al.~\cite{scaillet2020high} provide high-frequency evidence for Bitcoin, finding that jumps are frequent events that cluster in time and are predictable from order-flow imbalance and bid--ask dynamics. Saef et al.~\cite{saef2024temporal} extend this with tick-by-tick data from seven major exchanges over April 2019--September 2021, finding that the largest cryptocurrencies jump on a substantial fraction of trading days (Bitcoin on $\sim$$58\%$, Ethereum on $\sim$$32\%$) with systematic temporal clustering. Chaim and Laurini~\cite{chaim2019nonlinear} document nonlinear dependence and tail co-movement across major cryptocurrencies via a multivariate stochastic-volatility model with discontinuous jumps to returns and volatility. The broader empirical stylized facts of asset returns---heavy tails, volatility clustering, jumps, leverage effects---are surveyed by Cont~\cite{cont2001empirical}.
+
+Block-time choice balances several distinct welfare components. On the \emph{consensus-cost} side, Decker and Wattenhofer~\cite{decker2013information} identify block propagation delay as the primary cause of forks in Bitcoin, and Croman et al.~\cite{croman2016scaling} identify per-block bandwidth overhead as the binding scaling constraint. On \emph{finality}, Buterin~\cite{buterin2023paths} surveys paths toward Ethereum single-slot finality, where the per-slot bottleneck is BLS aggregation over committee attestations. On \emph{decentralization and censorship resistance}, Benhaim et al.~\cite{benhaim2024scaling} analyze committee-based consensus and show that it achieves equivalent security with committees one to two orders of magnitude smaller than stake-weighted lottery protocols. Their results legitimize the architecture underlying sub-second blocks on Solana and Cosmos but expose how small committees increase censorship vulnerability. On \emph{MEV redistribution}, Daian et al.~\cite{daian2020flash} document the maximal-extractable-value (MEV) economy that block-time mediates: longer blocks expand per-block extractable value while shorter blocks fragment it and reduce the searcher timing advantage. \emph{Oracle freshness}, or the gap between on-chain feeds and live markets, scales directly with $\dt$ and constrains downstream applications relying on those feeds. LP-side adverse selection, the subject of this paper, is one input among these.
+
+Two gaps emerge. First, the LVR construct is well-developed under GBM, but has not been extended to jump-diffusion reference prices despite the empirical prevalence of price discontinuities in crypto markets. Second, the LP-side literature lacks an explicit planner's optimum that incorporates jumps and exposes how jump parameters enter or do not enter the optimum. The present paper closes both gaps by deriving the LVR rate under Merton jump-diffusion in closed form, identifying the jump-induced floor, and characterizing the LP-side planner's block-time optimum. Adjacent threads beyond the scope here, such as full social-welfare composition with MEV/finality/oracle freshness, richer jump dynamics, and high-frequency empirical calibration, can build on the closed-form decomposition.
+
+\section{Model}\label{sec:model}
+
+The model builds on Milionis et al.~\cite{milionis2022automated,milionis2023automated} and extends their setup in two ways. First, the reference price follows a Merton jump-diffusion rather than pure GBM, capturing the discontinuous price moves documented empirically in cryptocurrency markets. Second, blocks arrive on a deterministic schedule of fixed length $\dt$ rather than as a Poisson process of rate $1/\dt$; this matches the semantics of slot-based chains like Ethereum and Solana.
+
+\subsection{Price process}
+Let $(\Omega, \mathcal{F}, (\mathcal{F}_t), \Prob)$ be a filtered probability space supporting a standard Brownian motion $W$ and an independent Poisson random measure with intensity $\lambda \, dt \, \nu(dy)$, where $\nu$ is the distribution of the log jump size $J$. I assume throughout that $J \sim \mathcal{N}(m, \delta^2)$ (Merton). The reference price $S_t$ follows
+\begin{equation}\label{eq:merton}
+\frac{dS_t}{S_{t-}} = \mu\,dt + \sigma \, dW_t + (e^{J_t} - 1)\,dN_t,
+\end{equation}
+with $N$ a Poisson process of intensity $\lambda$. The notation $S_{t-} := \lim_{s\uparrow t} S_s$ denotes the left limit, i.e., the pre-jump price at time $t$; using $S_{t-}$ rather than $S_t$ in the denominator makes the relative increment well-defined at jump times and ensures the integrand is predictable.
+
+\subsection{CPMM}
+A CPMM with reserves $(x_t, y_t)$ maintains the invariant $x_t y_t = L$. The marginal pool price is $P_t = y_t / x_t$, and the pool's holdings as functions of $P$ are
+\[
+x(P) = \sqrt{L/P}, \qquad y(P) = \sqrt{L P}.
+\]
+The pool value (in numeraire units) at marginal price $P$ is
+\[
+V(P) \;:=\; y(P) + P\,x(P) \;=\; 2\sqrt{LP}.
+\]
+By the envelope identity, $V'(P) = x(P)$ and
+\[
+V''(P) = -\frac{1}{2} \, \frac{\sqrt{L}}{P^{3/2}} = -\frac{x(P)}{2P} < 0.
+\]
+The pool value $V$ is concave; this concavity is the source of LVR. We work with the full-range Uniswap specialization throughout for concreteness, but per Milionis et al.~\cite[Remark~1]{milionis2022automated} the LVR construct depends only on a locally-smooth demand curve $x^*(P)$ and applies with no modification to general CFMMs and concentrated-liquidity AMMs (within active tick ranges).
+
+\subsection{Arbitrageur}
+A risk-neutral, capital-unconstrained arbitrageur observes the external price $S_t$ continuously and the pool price $P_t$. Trading on the pool incurs a proportional fee $\gamma \in [0,1)$ in log-price units (i.e., a swap effectively moves the marginal price by an extra factor $e^{\pm\gamma}$). Blocks have length $\dt$ and the arbitrageur can submit at most one trade per block, executed at the block-end price $S_{(k+1)\dt}$. The arbitrageur trades whenever it is profitable. The frictionless-arbitrageur assumption (zero latency, unlimited capital, no MEV-share to LPs) makes the LVR rate computed here an \emph{upper bound on LP adverse selection}; under finite arbitrageur capital, latency, or order-flow-auction redistribution \cite{capponi2024price}, realized LP loss is lower and the jump floor becomes a probabilistic upper bound.
+
+\subsection{LVR}
+Following Milionis et al.~\cite{milionis2022automated}, define the LVR over $[0,T]$ as
+\begin{equation}\label{eq:lvrdef}
+\mathrm{LVR}(T) \;:=\; \int_0^T V'(P_{s-}) \, dP_s \;-\; \big[V(P_T) - V(P_0)\big].
+\end{equation}
+The first term is the return of a rebalancing strategy holding $V'(P_{s-}) = x(P_{s-})$ units of the risky asset at each instant; the second is the LP's mark-to-market return. The \emph{LVR rate} is $\ell(t) = \E_t[d\mathrm{LVR}_t]/dt$, evaluated at the current pool state.
+
+In the continuous-arbitrage limit ($\gamma = 0$, $\dt \to 0$), the pool price tracks the reference price, $P_t \equiv S_t$, and \eqref{eq:lvrdef} is the It\^o--L\'evy remainder of $V(S_t)$.
+
+\section{LVR under Jump-Diffusion: Zero-Fee Decomposition}\label{sec:zerofees}
+
+\begin{theorem}[LVR decomposition]\label{thm:decomp}
+Under the zero-fee continuous-arbitrage limit with $S_t$ following \eqref{eq:merton} and the CPMM pool value $V(P) = 2\sqrt{LP}$, the instantaneous LVR rate is
+\begin{equation}\label{eq:thm1}
+\ell \;=\; \underbrace{\frac{\sigma^2}{8} V(S_t)}_{\text{diffusion-LVR}} \;+\; \underbrace{\frac{\lambda}{2}\,V(S_t)\,\E[(e^{J/2} - 1)^2]}_{\text{jump-LVR}},
+\end{equation}
+and for $J \sim \mathcal{N}(m, \delta^2)$,
+\[
+\E[(e^{J/2} - 1)^2] = e^{m + \delta^2/2} - 2 e^{m/2 + \delta^2/8} + 1 \;\geq\; 0.
+\]
+This expression is $0$ if and only if $J \equiv 0$.
+\end{theorem}
+
+\begin{proof}
+I work under a measure for which $S$ is a (local) martingale; the LVR rate is defined as a quadratic-variation cost and is measure-independent at the rate level (cf.~\cite{milionis2022automated}). Write $V_t := V(S_t)$. The It\^o--L\'evy formula for jump-diffusion processes \cite[Prop.~8.14]{cont2003financial} applied to $V$, with $S$ satisfying \eqref{eq:merton}, gives
+\begin{align*}
+V(S_t) - V(S_0) =\;& \int_0^t V'(S_{s-})\,dS_s \\
+&+ \tfrac{1}{2}\int_0^t V''(S_{s-})\,\sigma^2 S_{s-}^2 \,ds \\
+&+ \sum_{0 < s \leq t} \!\Big[V(S_s) - V(S_{s-}) - V'(S_{s-})(S_s - S_{s-})\Big].
+\end{align*}
+Substituting into \eqref{eq:lvrdef},
+\begin{equation}\label{eq:lvr-itl}
+\mathrm{LVR}(t) \;=\; -\tfrac{1}{2}\int_0^t V''(S_{s-})\,\sigma^2 S_{s-}^2 \, ds \;-\; \sum_{0 < s \leq t}\!\Big[V(S_s) - V(S_{s-}) - V'(S_{s-})\,\Delta S_s\Big].
+\end{equation}
+Both terms are nonnegative because $V$ is concave: $V''<0$ and $V(S_s) \leq V(S_{s-}) + V'(S_{s-})\Delta S_s$.
+
+\emph{Diffusion term.} Using $V''(P) = -x(P)/(2P)$ and $V(P) = 2\sqrt{LP}$,
+\[
+-\tfrac{1}{2} V''(P) \sigma^2 P^2 \;=\; \tfrac{\sigma^2}{4} P\,x(P) \;=\; \tfrac{\sigma^2}{4} \sqrt{L P} \;=\; \tfrac{\sigma^2}{8} V(P).
+\]
+
+\emph{Jump term.} At a jump time $\tau$ with $S_\tau = S_{\tau-} e^{J}$, let $r := e^J$. Then
+\begin{align*}
+V(S_\tau) - V(S_{\tau-}) - V'(S_{\tau-})\,\Delta S_\tau
+&= 2\sqrt{L S_{\tau-} r} - 2\sqrt{L S_{\tau-}} - \sqrt{L/S_{\tau-}}\,S_{\tau-}(r-1) \\
+&= 2\sqrt{L S_{\tau-}}\Big[\sqrt{r} - 1 - \tfrac{r-1}{2}\Big] \\
+&= -\sqrt{L S_{\tau-}}\,(\sqrt{r}-1)^2 \\
+&= -\tfrac{1}{2}\,V(S_{\tau-})\,(e^{J/2} - 1)^2.
+\end{align*}
+The jump contribution to \eqref{eq:lvr-itl} is therefore $\sum_{\tau} \tfrac{1}{2}\,V(S_{\tau-})\,(e^{J_\tau/2} - 1)^2$. By the marked-Poisson compensator formula \cite[Prop.~8.8]{cont2003financial}, and using the independence of jump marks $J$ from the predictable filtration $\mathcal{F}_{\tau-}$,
+\[
+\E\!\Big[\sum_{\tau \leq t} \tfrac{1}{2}V(S_{\tau-})(e^{J_\tau/2}-1)^2\Big] \;=\; \tfrac{\lambda}{2}\,\E[(e^{J/2}-1)^2]\cdot\E\!\Big[\int_0^t V(S_{s-})\,ds\Big],
+\]
+so the expected rate at state $V_t$ is $\tfrac{\lambda}{2} V_t \E[(e^{J/2}-1)^2]$.
+
+\emph{Moments.} Expanding $(e^{J/2}-1)^2 = e^{J} - 2 e^{J/2} + 1$ and taking expectations under $J \sim \mathcal{N}(m,\delta^2)$,
+\[
+\E[(e^{J/2}-1)^2] = e^{m+\delta^2/2} - 2 e^{m/2 + \delta^2/8} + 1.
+\]
+This quantity is nonnegative by Jensen's inequality applied to the strictly convex map $u \mapsto (e^{u/2}-1)^2$, with equality only at the degenerate case $J\equiv 0$.
+\end{proof}
+
+\begin{remark}\label{rem:generaljumps}
+The proof depends on the jump distribution only through $\E[(e^{J/2}-1)^2]$. For any compound-Poisson jump measure $\nu$ with $\int (e^{j/2}-1)^2\,\nu(dj) < \infty$ and $\nu \neq \delta_0$, the jump-LVR rate is $\tfrac{\lambda V}{2}\int (e^{j/2}-1)^2\,\nu(dj) > 0$. Merton is illustrative; Kou's asymmetric Laplace and the Carr--Geman--Madan--Yor model admit the same structure with different moments.
+\end{remark}
+
+\begin{remark}\label{rem:atomic}
+Theorem~\ref{thm:decomp} is intrinsically about quadratic variation. The diffusion piece is the standard result of Milionis et al.~\cite{milionis2022automated}. The jump piece quantifies the concavity loss at each discontinuity. The decomposition is additive because the It\^o--L\'evy remainder is additive over continuous and jump variation.
+\end{remark}
+
+\begin{remark}\label{rem:dtinvariant}
+Theorem~\ref{thm:decomp} does not involve $\dt$. At $\gamma=0$, the arbitrageur eliminates any pricing gap within the next block, so block-time refinement only redistributes \emph{when} the loss is realized, not its rate. The block-time becomes economically relevant only once fees create a no-arbitrage band.
+\end{remark}
+
+\section{Fees and Block Time}\label{sec:fees}
+
+I now allow $\gamma > 0$ and finite $\dt > 0$. Within a block $[k\dt, (k+1)\dt]$, the pool price is static at $P_{k\dt}$ and the reference price evolves according to \eqref{eq:merton}. At block end the arbitrageur trades if and only if the implied log-price mismatch exceeds the fee threshold $\gamma$. Following Milionis et al.~\cite{milionis2023automated}, and based on the measure-independence of the LVR rate established in the proof of Theorem~\ref{thm:decomp}, I set $\mu = \tfrac{1}{2}\sigma^2 - \lambda m$ so that the log-price process $\log S_t$ is exactly driftless.
+
+\subsection{Diffusion contribution with fees}
+
+In the absence of jumps, the symmetry assumption above gives the per-block log return $X_k = \sigma\sqrt{\dt}\,Z_k$ with $Z_k \sim \mathcal{N}(0,1)$ exactly.
+
+For a CPMM under GBM with deterministic blocks of duration $\dt$, the per-block expected LVR is
+\begin{equation}\label{eq:Fresult}
+\E[\text{LVR per block}] \;=\; \tfrac{\sigma^2 \dt}{8}\,V \cdot F\!\left(\tfrac{\gamma}{\sigma\sqrt{\dt}}\right),
+\end{equation}
+where
+\begin{equation}\label{eq:F}
+F(z) \;=\; 2\Big[(1+z^2)\,\Phi(-z) - z\,\varphi(z)\Big], \qquad z \geq 0,
+\end{equation}
+and $\Phi,\varphi$ are the standard-normal CDF and PDF. Equation~\eqref{eq:Fresult} follows from the truncated-normal moment identity~\eqref{eq:trunc-moment} applied to the per-block log return $X_k \sim \mathcal{N}(0,\sigma^2\dt)$, and matches the form empirically tested by Fritsch and Canidio~\cite{fritsch2024measuring}. The function $F$ satisfies $F(0)=1$, $F(z) \sim 4\,\varphi(z)/z^3$ as $z \to \infty$, and
+\begin{equation}\label{eq:Fprime}
+F'(z) = 4\,\big[z\,\Phi(-z) - \varphi(z)\big] \;<\; 0 \quad \text{for all } z > 0,
+\end{equation}
+the negativity follows from Mill's inequality $z\,\Phi(-z) < \varphi(z)$. The derivation rests on a first-order pool-curvature Taylor expansion of $V$ at log-displacement $\xi$ giving the per-block loss $\tfrac{V}{8}\xi^2$ with $O(\xi^3)$ corrections, and on the truncated-normal second-moment identity
+\begin{equation}\label{eq:trunc-moment}
+\int_z^\infty (u - z)^2 \varphi(u)\,du \;=\; (1 + z^2)\Phi(-z) - z\varphi(z),
+\end{equation}
+both of which the jump-case Lemma~\ref{lem:G} below reuses.
+
+\subsection{Jump contribution with fees}
+
+When the reference price jumps by $J$ within a block, the arbitrageur captures the concavity loss only if the jump exceeds the fee threshold (otherwise the no-arbitrage band absorbs it without realization).
+
+\begin{lemma}[Jump LVR with fees]\label{lem:G}
+Under \eqref{eq:merton} and the same first-order pool-curvature expansion underlying \eqref{eq:Fresult}, the contribution of jumps to the LVR rate is $\lambda V \cdot G(\gamma; m, \delta^2)$, where
+\begin{equation}\label{eq:G}
+G(\gamma; m, \delta^2) \;:=\; \tfrac{1}{8}\,\E\!\Big[(|J| - \gamma)^2 \cdot \1\{|J| > \gamma\}\Big].
+\end{equation}
+For $J \sim \mathcal{N}(m,\delta^2)$, $G(\gamma;m,\delta^2)$ is strictly positive whenever $\Prob(|J|>\gamma) > 0$, satisfies $G(0;m,\delta^2) = (m^2 + \delta^2)/8$, and is strictly decreasing in $\gamma$.
+\end{lemma}
+
+\begin{proof}
+At a jump of log-size $J$ with $|J|>\gamma$, the arbitrageur executes within the block, leaving the pool's marginal log-price at distance $\gamma$ from the external (inside the no-arbitrage band) and capturing the residual concavity gap. The LP's net adverse-selection loss is the Taylor remainder of $V$ at log-displacement $|J|-\gamma$. By the same Taylor-remainder calculation underlying \eqref{eq:Fresult} (with $\xi := |J|-\gamma$ replacing the diffusion displacement), this loss equals $\tfrac{V}{8}(|J|-\gamma)^2$ to the first order, suppressing $O(\xi^3)$ corrections in the pool-curvature expansion. When $|J| \leq \gamma$ the arbitrageur does not trade, and the resulting price gap relaxes via subsequent diffusion arbitrage---I charge that relaxation to the diffusion term of Theorem~\ref{thm:fee} to avoid double-counting. Independence of jump marks from the block clock and the marked-Poisson compensator formula yield $\lambda V \cdot G(\gamma;m,\delta^2)$. Strict monotonicity in $\gamma$ follows since the integrand $(|j|-\gamma)^2 \1\{|j|>\gamma\}$ is strictly decreasing in $\gamma$ pointwise on the support.
+\end{proof}
+
+A closed-form evaluation for symmetric Merton jumps ($m=0$, $J \sim \mathcal{N}(0,\delta^2)$): letting $\zeta := \gamma/\delta$ and using the truncated-normal moment identity~\eqref{eq:trunc-moment},
+\begin{equation}\label{eq:Gclosed}
+G(\gamma; 0, \delta^2) \;=\; \tfrac{\delta^2}{4}\,\big[(1+\zeta^2)\,\Phi(-\zeta) - \zeta\,\varphi(\zeta)\big] \;=\; \tfrac{\delta^2}{8}\,F(\zeta).
+\end{equation}
+Thus $G$ inherits exactly the same fee-multiplier shape as $F$, but evaluated at the jump-size scale $\delta$ rather than the per-block diffusion scale $\sigma\sqrt{\dt}$. At $\gamma=0$, $G(0;0,\delta^2) = \delta^2/8$. For asymmetric Merton ($m \neq 0$) and for other jump distributions, $G$ admits analogous truncated-moment representations.
+
+\begin{remark}\label{rem:lvrequivalence}
+Equation \eqref{eq:Gclosed} reveals a clean equivalence: a Poisson stream of jumps with standard deviation $\delta$ contributes the same LVR rate as a diffusion with effective volatility $\sigma_J := \delta\sqrt{\lambda}$. In the no-fee limit ($\gamma=0$) both give $\sigma_J^2 V/8$. With fees, the diffusion suffers the $F(\gamma/(\sigma\sqrt{\dt}))$ discount which becomes severe as $\dt \to 0$, while jumps suffer only the $F(\gamma/\delta)$ discount which is $\dt$-invariant. The jump floor's persistence is the formal expression of this asymmetry.
+\end{remark}
+
+\begin{remark}\label{rem:doublecount}
+The assertion in the proof of Lemma~\ref{lem:G} that uncleared jumps are absorbed by the diffusion term~\eqref{eq:Fresult} is exact only at the first order. In a block containing a jump $|J| \leq \gamma$, the diffusion realignment begins from a pool-external log-gap of size $|J|$ rather than zero, so the per-block diffusion-LVR is not exactly $(\sigma^2\dt/8) V F(\gamma/(\sigma\sqrt{\dt}))$. The correction satisfies
+\[
+\big|\E[(\,|X+J|-\gamma)^2 \1_{|X+J|>\gamma}] - \E[(|X|-\gamma)^2 \1_{|X|>\gamma}]\big| \;\leq\; \gamma\,(2\sigma\sqrt{\dt}+\gamma),
+\]
+by a triangle-inequality bound on the truncated quadratic moment. The total per-time bias is therefore at most $\lambda \Prob(|J| \leq \gamma)\cdot V\gamma(2\sigma\sqrt{\dt}+\gamma)/8$. For the calibration of Section~\ref{sec:numerics} ($\lambda = 120$/yr, $\gamma = 5$bp, $\sigma\sqrt{\dt} = 5.2\times 10^{-4}$ at $\dt = 12$~s), this bound evaluates to $<\!0.002$ bp/yr, i.e.\ five orders of magnitude below the $131$ bp/yr jump floor. The first-order additive decomposition is thus accurate to $O(\lambda\dt\gamma^2)$, a truncation order beyond the $O(\xi^3)$ pool-curvature expansion.
+\end{remark}
+
+\subsection{Main formula}
+
+Combining the diffusion contribution~\eqref{eq:Fresult} with the jump contribution of Lemma~\ref{lem:G} yields the LVR rate as a sum of a $\dt$-dependent diffusion term and a $\dt$-invariant jump floor. The decomposition is additive because the It\^o--L\'evy remainder underlying both pieces separates continuous and jump variation, and the first-order pool-curvature expansion preserves this separation up to the sub-leading bias quantified in Remark~\ref{rem:doublecount}.
+
+\begin{theorem}[LVR rate under jump-diffusion with fees]\label{thm:fee}
+Under \eqref{eq:merton} with swap fee $\gamma \in [0,1)$ and block time $\dt > 0$, the LVR rate of a CPMM is
+\begin{equation}\label{eq:main}
+\boxed{\;\ell(\dt) \;=\; \tfrac{\sigma^2}{8}\,V \cdot F\!\Big(\tfrac{\gamma}{\sigma\sqrt{\dt}}\Big) \;+\; \lambda \, V \cdot G(\gamma; m, \delta^2),\;}
+\end{equation}
+with $F$ as in \eqref{eq:F} and $G$ as in \eqref{eq:G}.
+\end{theorem}
+
+\begin{remark}\label{rem:limit}
+Theorem~\ref{thm:decomp} is exact in the continuous-arbitrage limit and gives the jump-LVR coefficient $\tfrac{1}{2}\E[(e^{J/2}-1)^2]$, which expands as $\E[J^2]/8 + 7\E[J^4]/384 + O(\E[J^6])$. Theorem~\ref{thm:fee} at $\gamma = 0$ gives $G(0;m,\delta^2) = (m^2+\delta^2)/8 = \E[J^2]/8$, matching the first-order term only. The discrepancy reflects the first-order pool-curvature expansion underlying both~\eqref{eq:Fresult} and Lemma~\ref{lem:G}: higher-order terms are $O(\delta^4)$ and negligible in the empirically relevant Merton range $\delta \lesssim 0.05$ ($<0.2\%$ relative correction), but grow to a few percent for tail-fat regimes with $\delta \gtrsim 0.10$.
+\end{remark}
+
+\begin{corollary}[Jump-LVR floor]\label{cor:floor}
+The map $\dt \mapsto \ell(\dt)$ is strictly increasing on $(0,\infty)$, with limits
+\[
+\lim_{\dt\to 0} \ell(\dt) = \lambda V \cdot G(\gamma; m, \delta^2), \qquad
+\lim_{\dt\to\infty} \ell(\dt) = \tfrac{\sigma^2}{8}V + \lambda V \cdot G(\gamma; m, \delta^2).
+\]
+In particular, no choice of $\dt$ reduces the LVR rate below the jump floor $\lambda V G$.
+\end{corollary}
+
+\begin{proof}
+$F$ is strictly decreasing in $\gamma/(\sigma\sqrt{\dt})$ by~\eqref{eq:Fprime}, hence strictly increasing in $\dt$ for fixed $\gamma, \sigma$. The limits follow from $F(\infty) = 0$ and $F(0)=1$. The jump term is independent of $\dt$.
+\end{proof}
+
+\section{The Planner's Block-Time Optimum}\label{sec:opt}
+
+Shorter blocks impose real costs that must be funded somehow. Many chains, like Ethereum and Solana, pay validators not in fiat but in newly issued native tokens, so the economic cost of consensus is the chain's issuance rate~\cite{buterin2023paths,beccuti2025staking}. Each block requires fixed per-block work such as block gossip and propagation~\cite{decker2013information}, BLS signature aggregation over committee attestations~\cite{buterin2023paths}, and view-change/commit overhead in committee-based consensus~\cite{benhaim2024scaling}. We adopt the simplest specification with fixed per-block cost rate $R(\dt) = R_1/\dt$, where $R_1$ is the per-block chain-level operational cost.
+
+A representative pool with TVL $V$ inherits a share of the chain's marginal cost in proportion to value secured: $c(\dt) = R(\dt) \cdot V/V_{\text{chain}} = c/\dt$ where $c := R_1 \cdot V/V_{\text{chain}}$ and $V_{\text{chain}}$ is the chain's native-token market capitalization. A finer LP-attribution would additionally account for ETH-side dilution through the chain's issuance. We abstract from this and leave the dilution channel for future work. The LP-side planner chooses $\dt$ to minimize the total per-unit-time cost rate combining the LVR rate $\ell(\dt)$ from Theorem~\ref{thm:fee} with the per-pool consensus cost,
+\begin{equation}\label{eq:Wplanner}
+W(\dt) \;=\; \ell(\dt) \;+\; \frac{c}{\dt}.
+\end{equation}
+
+
+\begin{theorem}[Optimal block time]\label{thm:planner}
+Let $c > 0$. Any interior critical point $\dt^{\mathrm{opt}}$ of $W(\dt)$ satisfies
+\begin{equation}\label{eq:foc}
+\ell'(\dt^{\mathrm{opt}}) \;=\; \frac{c}{(\dt^{\mathrm{opt}})^2}.
+\end{equation}
+With $z = \gamma/(\sigma\sqrt{\dt})$, $dz/d\dt = -\gamma/(2\sigma\,\dt^{3/2})$, and \eqref{eq:Fprime},
+\begin{equation}\label{eq:focexplicit}
+\ell'(\dt) \;=\; \tfrac{\sigma^2 V}{8}\,F'(z)\cdot\tfrac{-\gamma}{2\sigma\,\dt^{3/2}}
+\;=\; \tfrac{V\,\gamma\,\sigma}{4\,\dt^{3/2}}\big[\varphi(z) - z\,\Phi(-z)\big].
+\end{equation}
+The first-order condition, after substituting $\dt = \gamma^2 / (\sigma^2 z^2)$, reduces to
+\begin{equation}\label{eq:planner}
+\boxed{\;\frac{\varphi(z^{\mathrm{opt}})}{z^{\mathrm{opt}}} - \Phi(-z^{\mathrm{opt}}) \;=\; \frac{4c}{V\gamma^2}.\;}
+\end{equation}
+The left-hand side is strictly decreasing in $z$ on $(0,\infty)$ from $+\infty$ to $0$. Hence \eqref{eq:planner} admits a unique solution $z^{\mathrm{opt}}>0$ for every $c > 0$, and correspondingly $\dt^{\mathrm{opt}} = \gamma^2/(\sigma^2 (z^{\mathrm{opt}})^2)$.
+\end{theorem}
+
+\begin{proof}
+$\ell$ is differentiable, strictly increasing, and bounded. $c/\dt$ is strictly decreasing. Computing $W'(\dt) = \ell'(\dt) - c/\dt^2$ and equating to zero gives \eqref{eq:foc}. Substituting \eqref{eq:focexplicit} and the change of variables $z = \gamma/(\sigma\sqrt{\dt})$ yields
+\[
+\tfrac{V\gamma\sigma}{4\dt^{3/2}}[\varphi(z) - z\Phi(-z)] = \tfrac{c}{\dt^2}
+\quad\Longleftrightarrow\quad
+\tfrac{V\gamma\sigma\dt^{1/2}}{4}[\varphi(z) - z\Phi(-z)] = c,
+\]
+and using $\sqrt{\dt} = \gamma/(\sigma z)$ gives \eqref{eq:planner}. The left-hand side $h(z) := \varphi(z)/z - \Phi(-z)$ satisfies $h(z) > 0$ on $(0,\infty)$ (Mill's inequality), $h(z) \to +\infty$ as $z\to 0^+$, $h(z) \to 0$ as $z\to\infty$, and
+$h'(z) = -\varphi(z)/z^2 < 0$ (the two $\varphi(z)$ terms from differentiating $\varphi(z)/z$ and $-\Phi(-z)$ cancel),
+so $h$ is strictly decreasing on $(0,\infty)$. The unique solution and corresponding $\dt^{\mathrm{opt}}$ follow. In practice $z^{\mathrm{opt}}$ is solved numerically: bisection on $h(z) - 4c/(V\gamma^2) = 0$ converges from any bracket like $[10^{-3}, 10^{3}]$, and Newton's iteration $z_{n+1} = z_n + z_n^2(h(z_n) - 4c/(V\gamma^2))/\varphi(z_n)$ converges quadratically from $z_0 = 1$.
+\end{proof}
+
+\begin{remark}\label{rem:cs}
+Differentiating Equation~\eqref{eq:planner} yields three qualitative sensitivities:
+\begin{itemize}
+\item $\partial \dt^{\mathrm{opt}}/\partial c > 0$: more expensive consensus lengthens the optimum. The planner amortizes the per-block cost over longer intervals, accepting more LVR per block.
+\item $\partial \dt^{\mathrm{opt}}/\partial \gamma$ is U-shaped. At very low $\gamma$ the fee multiplier $F$ stays close to $1$ and block-shortening cannot suppress diffusion-LVR; at very high $\gamma$ $F$ is already crushed and shortening offers no further benefit. The interior minimum sits where block-shortening is an effective LVR lever.
+\item $\partial \dt^{\mathrm{opt}}/\partial \lambda = \partial \dt^{\mathrm{opt}}/\partial m = \partial \dt^{\mathrm{opt}}/\partial \delta = 0$: jump parameters do not enter the first-order condition. Jumps shift the level of $W$ by $\lambda V G$ but leave the marginal tradeoff untouched. The planner cannot use block time to manage jump-LVR, only fees and out-of-model MEV-redistribution mechanisms can. The invariance is exact at first order, higher-order corrections are $O(\lambda\dt \cdot \delta^2)$.
+\end{itemize}
+The last point is the paper's main qualitative message: jumps shift the level of LVR but not the planner's marginal tradeoff.
+\end{remark}
+
+\section{Numerical Illustration}\label{sec:numerics}
+
+I illustrate the qualitative structure of Theorems~\ref{thm:fee} and \ref{thm:planner} for a hypothetical full-rangeLP on a ETH/USDT Uniswap pool. Model parameters are summarized in the table below. 
+\begin{center}
+\begin{tabular}{lc}
+\toprule
+Parameter & Value \\
+\midrule
+$\sigma$ (diffusion volatility) & $0.85$ \\
+$\lambda$ (jump intensity) & $120$/yr \\
+$m$ (mean log jump) & $0$ \\
+$\delta$ (std of log jump) & $0.03$ \\
+$\gamma$ (swap fee) & $0.0005$ \\
+$V$ (pool TVL) & $1{,}000{,}000$ USD \\
+$c$ (consensus cost) & $260 \times 10^{-5}$ USD/block \\
+\bottomrule
+\end{tabular}
+\end{center}
+The values for $(\sigma, \lambda, \delta)$ are calibrated to Saef et al.~\cite{saef2024temporal} who use tick-level data from major exchanges over April 2019--September 2021\footnote{$\sigma$ is a Gaussian fit to the reported $5$th--$95$th percentile of ETH daily returns, $\lambda$ corresponds to the $32.02\%$ of $865$ test days with a detected jump, and $\delta$ is a pooled cross-currency Gaussian fit via mean $|J|$.}. The per-pool consensus cost $c$ follows from Ethereum's gross issuance ($\sim\!\$1.7$B/yr at $V_{\text{ETH}} \approx \$208$B), scaled by $25\%/30\% \approx 0.83$ to reflect that current staking ($\sim\!30\%$ of supply) exceeds Drake's security-optimal $1/4$~\cite{drake2025croissant,elowsson2024endgame}, then attributed pro-rata by $V/V_{\text{chain}} = 4.8 \times 10^{-6}$, yielding $c \approx \$260 \times 10^{-5}$/block. The remaining parameters are modeling choices: $m = 0$ (symmetric jumps), $\gamma = 5$~bps (Uniswap $0.05\%$ tier), $V = \$1$M (pool TVL). Sensitivities below cover $\sigma \in \{0.30, 0.50, 1.10, 1.50\}$, $\lambda \in \{30, 480, 1920\}$/yr, $c \in \{2, 10, 30, 500\} \times 10^{-5}$.
+
+\paragraph{Closed-form magnitudes (Theorem~\ref{thm:fee}).}
+Two reference numbers anchor this section: the diffusion ceiling $\sigma^2/8 = 903$~bp/yr (as $\dt \to \infty$) and the jump floor $\lambda G = 131$~bp/yr (persists as $\dt \to 0$). The fee has a negligible effect on the jump term ($F(0.0167) = 0.974$, a $\sim\!3\%$ trim) since $\gamma/\delta = 0.0167$ lies deep inside the support of $J$. On the diffusion term the fee is the dominant suppression mechanism at short $\dt$.
+
+\paragraph{Chain-by-chain LVR rate.}
+Evaluating \eqref{eq:main} at the baseline $(\sigma,\lambda,\delta,\gamma)$ over a range of $\dt$ from Ethereum L1 down to a sub-second app-chain target, with $z(\dt) = \gamma/(\sigma\sqrt{\dt})$ and the diffusion share $(\sigma^2/8)F(z)/\ell$ reported alongside:
+
+\begin{center}
+\begin{tabular}{lrrr}
+\toprule
+Chain & $\dt$ & $\ell$ (bp/yr) & diffusion share \\
+\midrule
+Ethereum L1 & $12$ s & $281.7$ & $53.3\%$ \\
+Base / OP L2 & $2$ s & $135.3$ & $2.9\%$ \\
+Solana & $400$ ms & $131.4$ & $\approx 0\%$ \\
+Arbitrum & $250$ ms & $131.4$ & $\approx 0\%$ \\
+App-chain & $50$ ms & $131.4$ & $\approx 0\%$ \\
+\midrule
+Jump floor ($\dt\to 0$) & --- & $131.4$ & $0\%$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{Volatility-regime sensitivity at Ethereum's $12$ s.}
+Holding $\lambda = 120$/yr and $\dt = 12$~s fixed and varying $\sigma$ across calm, baseline, and stress regimes:
+\begin{center}
+\begin{tabular}{rrr}
+\toprule
+$\sigma$ & $\ell$ (bp/yr) & diffusion share \\
+\midrule
+$0.30$ (calm) & $131.6$ & $0.1\%$ \\
+$0.50$ & $142.0$ & $7.4\%$ \\
+$0.85$ (baseline) & $281.7$ & $53.3\%$ \\
+$1.10$ & $529.9$ & $75.2\%$ \\
+$1.50$ (stress) & $1{,}219.8$ & $89.2\%$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+The diffusion share at $12$ s is highly volatility-dependent: in a calm regime ($\sigma \lesssim 0.50$) the slot sits deep in the jump-dominated regime and shorter blocks barely help; at the Saef baseline it is mildly diffusion-dominated ($53\%$); stress conditions reinforce this. The case for shorter blocks at Ethereum L1 is therefore strong in stress regimes and weak in calm ones.
+
+\paragraph{Cross-section: $\ell_{\text{diff}}/\ell_{\text{jump}}$ at $\dt = 12$ s.}
+The diffusion-to-jump LVR ratio at fixed $\dt$ determines whether shortening blocks reduces overall LVR. The table reports this ratio at Ethereum's $12$-second block-time across a $(\sigma, \lambda)$ grid. Ratios above $1$ are diffusion-dominated and shorter blocks help, below $1$ the LP-side gain is small.
+\begin{center}
+\begin{tabular}{r|rrrr}
+\toprule
+$\sigma\backslash\lambda$ & $30$/yr & $120$/yr & $480$/yr & $1920$/yr \\
+\midrule
+$0.30$ & $0.01$ & $0.00$ & $0.00$ & $0.00$ \\
+$0.50$ & $0.32$ & $0.08$ & $0.02$ & $0.01$ \\
+$0.85$ & $4.58$ & $1.14$ & $0.29$ & $0.07$ \\
+$1.10$ & $12.2$ & $3.04$ & $0.76$ & $0.19$ \\
+$1.50$ & $33.1$ & $8.29$ & $2.07$ & $0.52$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+The Saef-calibrated baseline $(\sigma = 0.85,\lambda = 120)$ gives a ratio of $1.14$, putting Ethereum's $12$-second block-time at the diffusion-jump boundary --- the two LVR sources contribute roughly equal shares. The surface spans four orders of magnitude across the grid. Any policy claim about $12$-second blocks is conditional on the volatility-and-jump-intensity regime, not on a single point estimate.
+
+\paragraph{Planner's optimum.}
+With $c$ calibrated to the issuance-derived baseline $260 \times 10^{-5}$ USD/block per \$1M TVL (Table~1), I report $\dt^{\mathrm{opt}}(c)$ across a sensitivity range $[2, 500] \times 10^{-5}$.
+\begin{center}
+\begin{tabular}{rr}
+\toprule
+$c$ ($\times 10^{-5}$ USD/block) & $\dt^{\mathrm{opt}}$ \\
+\midrule
+$500$ & $10.6$ s \\
+$260$ (baseline) & $7.1$ s \\
+$90$ & $4.2$ s \\
+$30$ & $2.9$ s \\
+$2$ & $1.4$ s \\
+\bottomrule
+\end{tabular}
+\end{center}
+At the baseline $c = 260 \times 10^{-5}$, $\dt^{\mathrm{opt}} \approx 7$~s or roughly half Ethereum's block-time but well above sub-second L2/app-chain timing. Under an LP-LVR-only objective Ethereum is too slow, but the case for sub-second blocks is weak: the jump floor binds before further shortening helps. However, the conclusion is one-sided and a full social-welfare treatment with MEV, finality, and oracle freshness could push $\dt^{\mathrm{opt}}$ back up.
+
+\section{Discussion}\label{sec:disc}
+
+\paragraph{Policy.}
+The LVR-driven case for shorter blocks is bounded above by the jump floor. Under geometric Brownian motion the marginal LVR savings from refining the block schedule are unbounded as $\dt \to 0$, but Corollary~\ref{cor:floor} shows that jumps cap those savings at a strictly positive floor that no block-time choice can drive below. The empirical magnitude of this constraint depends on the price regime: for the Saef-calibrated parameters of Section~\ref{sec:numerics}, Ethereum's $12$-second block-time retains roughly $53\%$ diffusion-driven LVR, leaving meaningful room for block-time policy. Moving to $2$-second L2 timing collapses the diffusion share below $3\%$, and pushing further into the sub-second regime of modern app-chains pins the rate at the floor of approximately $131$ bp/yr. Once the jump floor binds, block-time refinement no longer helps. The LP-side levers that remain in this regime are fee-tier design, batch auctions that eliminate the per-block arbitrage window at source, and LVR-rebate designs such as auction-managed AMMs that route pool-management revenue back to LPs.
+
+Calibrating the consensus cost from Ethereum's gross issuance places the LP-side planner's optimum at $\dt^{\mathrm{opt}} \approx 7$~seconds or roughly half the current $12$-second block-time, but well within the few-seconds range rather than the sub-second regime. The qualitative takeaway is that Ethereum's block-time is meaningfully too long under an LP-LVR-only objective, while the aggressive sub-second targets pursued by some chains overshoot what LVR considerations alone would justify.
+
+\paragraph{Limitations.}
+The welfare objective is LP-LVR-only, so the optimum from $W(\dt) = \ell(\dt) + c/\dt$ is an LP-side input to a larger welfare problem, not a standalone prescription. A full social-welfare treatment must additionally weigh MEV redistribution, finality, censorship resistance, and oracle freshness. The consensus-cost model attributes issuance pro-rata by value secured, abstracting from the LP-side dilution channel through which a native-token-holding LP would bear inflation directly. The calibration of $c$ further assumes that observed issuance approximates true validator operating cost, an assumption that breaks if chains pay above cost as a growth subsidy or finance validators substantially from MEV and fees rather than issuance. The Merton parametrization is illustrative: richer specifications such as stochastic volatility, time-varying jump intensity, or asymmetric jumps would yield structurally similar floors with different shape coefficients. A rigorous calibration of the model to empirical data is left for future work.
+
+\section{Conclusion}\label{sec:conclusion}
+
+This paper has established three results for the CPMM under Merton jump-diffusion prices. The zero-fee LVR rate decomposes additively into a diffusion component $\sigma^2 V/8$ and a jump component $\tfrac{\lambda V}{2}\E[(e^{J/2}-1)^2]$, strictly positive whenever jumps are present. The decomposition survives swap fees and discrete blocks: the diffusion term picks up a fee multiplier $F$, while the jump contribution becomes $\dt$-invariant and constitutes an irreducible floor. The LP-side planner's optimum is invariant in the jump parameters $(\lambda, m, \delta)$ --- jumps shift the level of LVR but not the marginal tradeoff that determines $\dt^{\mathrm{opt}}$. At parameters calibrated to real-world data, the optimum sits at roughly $7$ seconds, about half Ethereum's $12$-second slot but well above the sub-second regime of modern L2s and app-chains.
+
+\bibliographystyle{splncs04}
+\bibliography{references}
+
+\end{document}

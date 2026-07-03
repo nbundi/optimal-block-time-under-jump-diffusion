@@ -1,0 +1,1326 @@
+\documentclass[11pt]{article}
+
+\usepackage[a4paper,margin=1.2in]{geometry}
+\usepackage{amsmath,amssymb,amsthm,mathtools}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{tikz}
+\usetikzlibrary{decorations.pathreplacing,calc}
+
+\hypersetup{colorlinks=true, linkcolor=blue!50!black, citecolor=blue!50!black}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Var}{\mathrm{Var}}
+\newcommand{\Prob}{\mathbb{P}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\dt}{\Delta t}
+\newcommand{\1}{\mathbf{1}}
+
+\title{Study Companion: \\
+The Mathematics of\\
+\emph{Optimal Block Time for AMM Liquidity Providers\\
+under Jump-Diffusion Prices}}
+\author{Nils Bundi}
+\date{}
+
+\begin{document}
+\maketitle
+\tableofcontents
+\vspace{1em}
+
+\noindent\textit{This document is a step-by-step companion to the main paper. Where the paper is terse, this document is verbose: it spells out the algebra, provides intuition for each step, and connects the derivations to standard results in stochastic analysis. Read this side-by-side with the paper.}
+
+\bigskip
+\hrule
+\bigskip
+
+\section{The setup}\label{sec:setup}
+
+The setup has four pieces: the price process, the constant-product market maker, the arbitrageur, and the LVR definition. Each piece is a deliberate modeling choice. This section walks through every choice with its motivation.
+
+\subsection{The price process}
+
+The reference price $S_t$ is the price on a centralized exchange or oracle. It is the price the AMM is being arbitraged \emph{against}. We model it as a \emph{Merton jump-diffusion}:
+\begin{equation}\label{eq:sde}
+\frac{dS_t}{S_{t-}} \;=\; \mu\,dt + \sigma\,dW_t + (e^{J_t} - 1)\,dN_t.
+\end{equation}
+
+Let us read each piece very carefully.
+
+\paragraph{Why a ratio, not a difference?}
+The left-hand side is the \emph{percentage return}, $dS_t / S_{t-}$, not the absolute change $dS_t$. Modeling percentage returns rather than absolute changes makes the process \emph{geometric}: if $S_t$ is the price of an asset, then doubling the scale of the price (e.g., a stock split) should not change the statistics of returns. Working with $dS_t / S_{t-}$ enforces this scale invariance and prevents $S_t$ from going negative.
+
+\paragraph{Why $S_{t-}$ in the denominator?}
+The minus subscript means ``the value of $S$ immediately before time $t$.'' Formally:
+\[
+S_{t-} \;:=\; \lim_{s \uparrow t} S_s.
+\]
+If $t$ is not a jump time, $S_t = S_{t-}$ (the process is continuous there). If $t$ is a jump time, $S_t \neq S_{t-}$. The jump has happened by $t$, but not by $t-$.
+
+We need this distinction because the integrand against $dS_t$ in stochastic integrals must be \emph{predictable}. That is, it must be known just \emph{before} a jump, not at or after it. If we wrote $S_t$ in the denominator at a jump time, we would be ``cheating'' by using post-jump information to scale the pre-jump update.
+
+\paragraph{The drift $\mu\,dt$.} A deterministic upward trend, like the expected return of a stock per unit time. For LVR analysis this term will turn out not to matter: LVR is a \emph{quadratic-variation} quantity that depends only on the second-order behavior of the price, not on the drift. We will keep $\mu$ in the model for generality but it will drop out of every result.
+
+\paragraph{The Brownian increment $\sigma\,dW_t$.} Here $W_t$ is a standard Brownian motion (in particular, $dW_t \sim \mathcal{N}(0, dt)$ over a small interval $dt$, and increments over disjoint intervals are independent). The coefficient $\sigma$ is the \emph{instantaneous volatility} of returns: over a small interval $dt$, the conditional variance of $dS_t / S_{t-}$ contributed by the Brownian part is $\sigma^2\,dt$. Between jumps, $S_t$ behaves like a geometric Brownian motion (the Black–Scholes model).
+
+\paragraph{The jump term $(e^{J_t} - 1)\,dN_t$.}
+This is the new ingredient relative to Black–Scholes. Two objects appear:
+\begin{itemize}[leftmargin=2em]
+\item $N_t$ is a \emph{Poisson process} with intensity $\lambda > 0$. This means: the times $\tau_1 < \tau_2 < \cdots$ at which $N$ increases by $1$ are random, the inter-arrival times $\tau_{i+1} - \tau_i$ are i.i.d.\ exponential with mean $1/\lambda$, and the expected number of jumps in any interval of length $T$ is $\lambda T$.
+\item $J_t$ is the \emph{log-jump size}. At each Poisson tick $\tau_i$, a random number $J_{\tau_i}$ is drawn (independently of everything that came before) from a fixed distribution: $J \sim \mathcal{N}(m, \delta^2)$. We call this the \emph{Merton} specialization. (Other choices: Kou (2002) uses an asymmetric double-exponential; we will see just below that the SDE structure is identical regardless of the choice of jump distribution.)
+\end{itemize}
+
+The product $(e^{J_t} - 1)\,dN_t$ is zero between jumps and equals $e^{J_{\tau_i}} - 1$ at the $i$-th jump. So at the jump time $\tau_i$, the relative price change is
+\[
+\frac{\Delta S_{\tau_i}}{S_{\tau_i-}} \;=\; e^{J_{\tau_i}} - 1, \qquad \text{i.e.,}\qquad S_{\tau_i} = S_{\tau_i-}\cdot e^{J_{\tau_i}}.
+\]
+A log-jump of size $J$ multiplies the price by $e^J$. If $J > 0$ the price jumps up. If $J < 0$ it jumps down. Because $S_{\tau_i-}$ is always positive and $e^J$ is always positive, the price stays positive. This is a desirable property.
+
+\paragraph{The rigorous form of the jump term.}
+The shorthand $(e^{J_t} - 1)\,dN_t$ in our SDE is informal but convenient. Written rigorously, the jump term is an integral against a \emph{Poisson random measure} $J$ on the product space $[0,\infty) \times \mathbb{R}$ (time axis, jump-size axis):
+\[
+\int_0^t \int_{\mathbb{R}} (e^y - 1)\,J(ds, dy) \;=\; \sum_{\tau_i \le t}(e^{J_{\tau_i}} - 1).
+\]
+The left-hand side is a continuous-looking integral. The right-hand side reveals what it actually computes: a sum over the (random) jump times $\tau_i$ with $(e^{J_{\tau_i}} - 1)$ as the summand. The two are the same object in different notations. The shorthand $(e^{J_t}-1)\,dN_t$ in equation~\eqref{eq:sde} packages this integral in differential form. At a jump time, $dN_t = 1$ and $J_t$ is the just-drawn mark. Elsewhere $dN_t = 0$ and the term contributes nothing.
+
+\paragraph{What is a Poisson random measure, exactly?}
+We used the term casually above. Here is the definition. An ordinary (deterministic) measure $\mu$ on a space $E$ assigns a non-negative number $\mu(A)$ to each measurable set $A \subseteq E$. For example, Lebesgue measure assigns each interval its length. A \emph{random measure} $M(\omega, \cdot)$ assigns a non-negative number $M(\omega, A)$ to each set $A$, but the number depends on the random outcome $\omega \in \Omega$. So $M(A)$ is itself a random variable for each fixed $A$.
+
+The specific random measure relevant for our SDE lives on the product space $E = [0, \infty) \times \mathbb{R}$. It is constructed from the pair $(N_t, J_{\tau_i})$ as follows. At each Poisson tick $\tau_i$, a mark $J_{\tau_i} \in \mathbb{R}$ is independently drawn from the jump-size distribution $\nu$ (in our paper, $\nu = \mathcal{N}(m, \delta^2)$). The random measure $J$ then places one unit of mass at the point $(\tau_i, J_{\tau_i}) \in E$ for each $i$:
+\[
+J(\omega, A) \;:=\; \#\big\{i \;:\; (\tau_i, J_{\tau_i}) \in A\big\} \;=\; \sum_{i \ge 1} \mathbf{1}_A(\tau_i, J_{\tau_i}).
+\]
+So $J(A)$ counts how many ``time--jump-size'' pairs fall inside the set $A$. It is a \emph{Poisson} random measure because the counts $J(A_1), J(A_2), \ldots$ for disjoint sets are independent Poisson random variables. Its expected count is
+\[
+\E[J(A)] \;=\; \int_A \lambda\,ds\,\nu(dy),
+\]
+and the deterministic measure $\lambda\,ds\,\nu(dy)$ is called the \emph{intensity measure} (or \emph{compensator}) of $J$.
+
+\paragraph{How integration against a random measure works.}
+Integrals against $J$ are defined pathwise as sums over the points where $J$ has mass:
+\[
+\int_0^t \int_{\mathbb{R}} \phi(s, y)\,J(ds, dy) \;:=\; \sum_{\tau_i \le t} \phi(\tau_i, J_{\tau_i}).
+\]
+The integral notation looks continuous, but it really is a sum. The random measure $J$ only ``hits'' a discrete set of points. The expected value of such an integral, by the \emph{compensator formula}, is
+\[
+\E\!\left[\int_0^t\!\int \phi(s, y)\,J(ds, dy)\right] \;=\; \int_0^t \!\int \phi(s, y)\,\lambda\,ds\,\nu(dy).
+\]
+Conceptually: ``the expected sum over jumps equals the integral against the intensity.'' This is the standard identity used throughout the proof of Theorem~1 (the marked-Poisson compensator formula, Cont \& Tankov 2003, Prop.~8.8).
+
+\paragraph{Why this notation?}
+The random-measure form has two ergonomic advantages over the compound-Poisson-sum form we will see next.
+\begin{enumerate}[leftmargin=2em]
+\item It lets us write the integrand as an arbitrary function $\phi(s, y)$ of both time and jump size, including state-dependent integrands like $\phi(s, y) = V(S_{s-})\,(e^{y/2} - 1)^2$ in the proof of Theorem~1. The compound-sum form would have to write this as $\sum V(S_{\tau_i-})\,(e^{J_i/2} - 1)^2$, which is correct but harder to manipulate.
+\item Compensator and martingale formulas (Cont \& Tankov 2003, Prop.~8.7 and 8.8) operate directly on the random-measure integral and give clean ``Riemann-like'' identities. The compound-Poisson-sum form requires re-deriving these identities from scratch each time.
+\end{enumerate}
+The two notations are mathematically equivalent. For the proof of Theorem~1, the random-measure form is the natural choice.
+
+\paragraph{Kou (2002): a related model with different jump-distribution choices.}
+The compound-Poisson sum form we just used to interpret $(e^{J_t} - 1)\,dN_t$ rigorously is exactly the form Kou (2002) chooses to write his SDE in. Kou's equation (1) reads
+\begin{equation}\label{eq:kou-sde}
+\frac{dS_t}{S_{t-}} \;=\; \mu\,dt + \sigma\,dW_t + d\!\left(\sum_{i=1}^{N(t)} (V_i - 1)\right),
+\end{equation}
+which is the same SDE structure as ours, with two trivial notational differences and one substantive modeling difference.
+
+\paragraph{Trivial: parametrization.}
+Kou parametrizes the $i$-th jump by the \emph{multiplicative factor} $V_i > 0$ (the price moves $S_{\tau_i-} \mapsto S_{\tau_i-} \cdot V_i$). We use the \emph{log-jump size} $J_i := \log V_i$ (the price moves $S_{\tau_i-} \mapsto S_{\tau_i-} \cdot e^{J_i}$). Since $V_i = e^{J_i}$ is bijective and $V_i - 1 = e^{J_i} - 1$, the two are the same object in different coordinates. The SDE structure (drift + Brownian + compound Poisson) is identical.
+
+\paragraph{Substantive: the jump distribution.}
+What actually distinguishes Kou's model from ours is the distribution placed on the jumps. Two aspects.
+
+\emph{Symmetry and shape.} Kou specifies the distribution of $Y := \log V$ as an \emph{asymmetric double-exponential} (Laplace) density:
+\[
+f_Y(y) \;=\; p\,\eta^+ e^{-\eta^+ y}\,\mathbf{1}_{y \ge 0} \;+\; (1-p)\,\eta^- e^{\eta^- y}\,\mathbf{1}_{y < 0},
+\]
+where $p \in [0,1]$ is the probability of an up-jump, and $\eta^+, \eta^- > 0$ control the rates of decay for up- and down-jumps respectively. The asymmetry $p \neq 1/2$ and $\eta^+ \neq \eta^-$ lets the distribution capture empirical skew between large up- and down-moves. Our paper uses \emph{symmetric Merton}: $J \sim \mathcal{N}(0, \delta^2)$ (mean zero, single scale parameter).
+
+\emph{Tail behavior.} Kou's exponential tails decay as $e^{-\eta^\pm |y|}$. These are heavier than Gaussian tails $e^{-y^2/(2\delta^2)}$. This puts more probability mass on large jumps. Empirically, cryptocurrency returns sometimes exhibit super-Gaussian tails, and Kou's parametrization fits these extreme events better than Merton's Gaussian. The flip side is that Merton's tighter tail keeps the closed-form moment expressions clean.
+
+\paragraph{Why both work for our results.}
+Theorem~1's decomposition $\ell = (\sigma^2/8) V + (\lambda/2) V \cdot \E[(e^{J/2}-1)^2]$ holds for \emph{any} compound-Poisson distribution with finite $\E[(e^{J/2}-1)^2]$. The structural results (jump floor, regime boundary, planner's invariance in jump parameters) survive any reasonable specification of the jump law. What changes between Merton and Kou is only the closed-form value of $\E[(e^{J/2}-1)^2]$:
+\begin{itemize}[leftmargin=2em]
+\item \emph{Merton} ($J \sim \mathcal{N}(m,\delta^2)$): $\E[(e^{J/2}-1)^2] = e^{m+\delta^2/2} - 2 e^{m/2 + \delta^2/8} + 1$. \\ (Derived in Section~\ref{sec:thm1}.)
+\item \emph{Kou} ($J$ asymmetric Laplace): a different closed-form expression in $p, \eta^+, \eta^-$, with the same structural role.
+\end{itemize}
+We specialize to Merton throughout the paper because the closed-form moment is simpler and the resulting algebra in Section 7's calibration is cleaner. The reader who prefers Kou's distribution should substitute the corresponding moment formula and re-run the calibration.
+
+\paragraph{Why Merton (Gaussian) jumps?}
+Three reasons:
+\begin{enumerate}[leftmargin=2em]
+\item \emph{Closed-form moments.} The moment generating function $\E[e^{aJ}] = e^{am + a^2\delta^2/2}$ has a clean form, which is what makes Theorem~1's moment expression $\E[(e^{J/2}-1)^2] = e^{m+\delta^2/2} - 2 e^{m/2 + \delta^2/8} + 1$ elementary.
+\item \emph{Historical priority.} Merton (1976) introduced this exact specification. It is the most-studied baseline.
+\item \emph{Generalization is easy.} The decomposition in Theorem~1 extends to any compound-Poisson jump measure $\nu$ with $\int (e^{j/2}-1)^2\,\nu(dj) < \infty$ (and $\nu \neq \delta_0$). Merton is a tractable special case, not a structurally distinguished one.
+\end{enumerate}
+
+\subsection{The constant-product market maker (CPMM)}
+
+The liquidity venue is a Uniswap-v2-style \emph{constant-product market maker}. Its state is two reserve balances, $x_t$ and $y_t$, of two assets. These are the ``risky'' asset (e.g.\ ETH) and the ``numeraire'' (e.g.\ USDC, DAI, or any other unit chosen as the accounting reference). Throughout, prices and the pool value $V$ are expressed in units of the numeraire. Nothing in the analysis assumes the numeraire is a fiat currency. The defining invariant is
+\begin{equation}\label{eq:invariant}
+x_t \cdot y_t \;=\; L,
+\end{equation}
+where $L$ is a constant set at deployment.
+
+\paragraph{The trade rule.}
+A trader who wants to receive $\delta y$ of numeraire in exchange for some $\delta x$ of the risky asset submits a transaction. The pool updates its reserves to keep~\eqref{eq:invariant} satisfied:
+\[
+(x_t + \delta x)(y_t - \delta y) \;=\; L.
+\]
+Solving for $\delta y$ given $\delta x$:
+\[
+\delta y \;=\; y_t \cdot \frac{\delta x}{x_t + \delta x}.
+\]
+For an infinitesimal trade ($\delta x \to 0$):
+\[
+\frac{\delta y}{\delta x} \;\to\; \frac{y_t}{x_t}.
+\]
+This limiting ratio is the \emph{marginal price} the pool quotes at instant $t$:
+\begin{equation}\label{eq:marginal}
+P_t \;:=\; \frac{y_t}{x_t}.
+\end{equation}
+
+\paragraph{Reserves as functions of price.}
+Equations~\eqref{eq:invariant} and~\eqref{eq:marginal} are two equations in two unknowns $(x, y)$. Solving:
+\[
+x(P) = \sqrt{L/P}, \qquad y(P) = \sqrt{LP}.
+\]
+You can verify by direct substitution that $x(P) \cdot y(P) = L$ and $y(P)/x(P) = P$. So the pool's state is fully encoded by the marginal price $P$ (given $L$).
+
+The function $x(P)$ tells us how much risky asset the pool holds when its marginal price is $P$. As $P$ increases (the risky asset appreciates), $x(P) = \sqrt{L/P}$ decreases. The pool has sold some risky asset. As $P$ decreases, the pool has bought some.
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[scale=1.0]
+  % Axes
+  \draw[->] (0,0) -- (6,0) node[right] {$x$ (risky asset reserve)};
+  \draw[->] (0,0) -- (0,5) node[above] {$y$ (numeraire reserve)};
+  % Hyperbola xy = 4
+  \draw[thick, blue, domain=0.8:5.5, samples=80] plot (\x, {4/\x});
+  % Two example points
+  \fill (1.0,4.0) circle (2pt);
+  \node[above right] at (1.0,4.0) {$(x_0, y_0) = (\sqrt{L/P_0},\,\sqrt{L\,P_0})$};
+  \fill (4.0,1.0) circle (2pt);
+  \node[above right] at (4.0,1.0) {$(x_1, y_1) = (\sqrt{L/P_1},\,\sqrt{L\,P_1})$};
+  % Slope-line annotations (rays from origin)
+  \draw[gray, dashed, thin] (0,0) -- (1.5,6);
+  \draw[gray, dashed, thin] (0,0) -- (6,1.5);
+  \node[gray] at (1.7, 5.8) {slope $P_0$ (high)};
+  \node[gray] at (6, 1.8) {slope $P_1$ (low)};
+  % Curve label
+  \node at (4.0, 3.5) {$xy = L$};
+\end{tikzpicture}
+\caption{The constant-product invariant $xy = L$ in reserve space. As trades happen, the pool moves along the blue hyperbola. The marginal price $P = y/x$ is the slope of the line from the origin to the current reserve point. A high $P$ puts the pool in the upper-left of the curve (much numeraire, little risky asset). A low $P$ puts it in the lower-right.}
+\label{fig:invariant}
+\end{figure}
+
+\paragraph{Pool value.}
+The total value of the pool, expressed in units of the numeraire, when the marginal price is $P$ is
+\[
+V(P) \;:=\; y(P) + P\,x(P) \;=\; \sqrt{LP} + P\sqrt{L/P}.
+\]
+The second term simplifies: $P\sqrt{L/P} = \sqrt{P^2 \cdot L/P} = \sqrt{LP}$. So
+\begin{equation}\label{eq:V}
+\boxed{V(P) \;=\; 2\sqrt{LP}.}
+\end{equation}
+This is the function whose curvature drives every LVR calculation that follows.
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[scale=1.0]
+  % Axes
+  \draw[->] (0,0) -- (6,0) node[right] {$P$ (marginal price)};
+  \draw[->] (0,0) -- (0,5) node[above] {$V(P)$ (pool value)};
+  % V(P) = 2*sqrt(P) (with L = 1)
+  \draw[thick, blue, domain=0:5.5, samples=100] plot (\x, {2*sqrt(\x)});
+  % Annotate curve
+  \node[blue] at (5, 5) {$V(P) = 2\sqrt{LP}$};
+  % Mark a few key features
+  \draw[gray, dotted] (1,0) -- (1,2);
+  \draw[gray, dotted] (0,2) -- (1,2);
+  \fill (1,2) circle (1.5pt);
+  \node[below] at (1,0) {\small $P_0$};
+  \node[left] at (0,2) {\small $V(P_0)$};
+  % Concavity arrow
+  \draw[->, gray, thick] (3.5,1.2) to[bend left=15] (4.7,3.8);
+  \node[gray, align=center] at (2.7, 2.8) {\small concave \\ \small (bends down)};
+\end{tikzpicture}
+\caption{The pool value $V(P) = 2\sqrt{LP}$ as a function of the marginal price. $V$ is increasing (a higher price means a more valuable pool) and concave (the curve bends down). The concavity is what costs the LP: a continuously-rebalanced portfolio with the same marginal exposure as the pool would follow the tangent line, which always sits above the curve. The gap between tangent and curve is LVR.}
+\label{fig:Vcurve}
+\end{figure}
+
+\paragraph{The envelope identity.}
+Differentiate $V$ with respect to $P$:
+\[
+V'(P) \;=\; \frac{d}{dP}\,2\sqrt{LP} \;=\; 2 \cdot \frac{1}{2} \cdot \frac{L}{\sqrt{LP}} \;=\; \frac{\sqrt{L}}{\sqrt{P}} \;=\; \sqrt{L/P}.
+\]
+But $\sqrt{L/P} = x(P)$. So
+\begin{equation}\label{eq:envelope}
+\boxed{V'(P) \;=\; x(P).}
+\end{equation}
+This is called the \emph{envelope identity}: the marginal change in pool value with respect to price equals the risky-asset holding. It is a deep fact about all constant-function market makers, not just constant-product.
+
+Why does it hold? Intuitively, when the price moves by $\Delta P$, two things change. (i) The pool still holds $x(P)$ units of risky asset at the moment of the move, and that holding contributes a change $x(P) \cdot \Delta P$ to the pool value (mark-to-market on existing inventory). (ii) The pool will also rebalance: $x$ and $y$ shift along the invariant curve $xy = L$ to keep the marginal price equal to the new $P + \Delta P$. But this second effect, by the envelope theorem from constrained optimization, has zero first-order contribution at the constrained optimum. So only the first effect matters at leading order, giving $V'(P) = x(P)$.
+
+\paragraph{Concavity.}
+Differentiate once more:
+\[
+V''(P) \;=\; \frac{d}{dP}\,\sqrt{L}\,P^{-1/2} \;=\; -\frac{1}{2}\sqrt{L}\,P^{-3/2} \;=\; -\frac{x(P)}{2P}.
+\]
+Since $x(P) > 0$ and $P > 0$, we have $V''(P) < 0$ everywhere: $V$ is \emph{concave} in $P$.
+
+\paragraph{Why concavity is the source of LVR.}
+Concavity means that for any two prices $P_0$ and $P_1$:
+\[
+V(P_1) \;<\; V(P_0) + V'(P_0) \cdot (P_1 - P_0).
+\]
+The right-hand side is the tangent line to $V$ at $P_0$, evaluated at $P_1$. So the pool value sits \emph{below} the tangent line.
+
+Operationally: imagine the price moves from $P_0$ to $P_1$. Two strategies are possible.
+\begin{itemize}[leftmargin=2em]
+\item \textbf{Bonding-curve LP (the AMM):} value goes from $V(P_0)$ to $V(P_1)$.
+\item \textbf{Rebalancing-strategy LP:} hold exactly $x(P_0)$ units of risky asset throughout (matching the AMM's marginal exposure at the start), value goes from $V(P_0) = y(P_0) + P_0 x(P_0)$ to $y(P_0) + P_1 x(P_0) = V(P_0) + x(P_0)(P_1 - P_0)$.
+\end{itemize}
+The gap between the rebalancing-strategy value and the AMM value is the area between the tangent line and the curve. By concavity, this gap is non-negative and grows quadratically in $|P_1 - P_0|$. \emph{That gap is the LVR.}
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[scale=1.2]
+  % Axes
+  \draw[->] (0,0) -- (6,0) node[right] {$P$};
+  \draw[->] (0,0) -- (0,5.2) node[above] {$V$};
+  % V(P) = 2 sqrt(P), L = 1
+  \draw[thick, blue, domain=0.05:5.5, samples=100] plot (\x, {2*sqrt(\x)});
+  \node[blue] at (5.0, 5.0) {$V(P) = 2\sqrt{LP}$};
+  % P_0 = 1, V(P_0) = 2, V'(P_0) = 1
+  \def\Pzero{1.0}
+  \def\Vzero{2.0}
+  \def\dVzero{1.0}
+  % Tangent line: y = V(P_0) + V'(P_0)(x - P_0)
+  \draw[thick, red, dashed, domain=0:5] plot (\x, {\Vzero + \dVzero*(\x - \Pzero)});
+  \node[red] at (5.0, 6.2) {};
+  \node[red, align=center] at (1.6, 0.7) {\small tangent at $P_0$: \\[-2pt] \small $V(P_0) + V'(P_0)(P - P_0)$};
+  % P_1 = 4, V(P_1) = 4, tangent at P_1 = 5
+  \def\Pone{4.0}
+  \def\Vone{4.0}
+  \def\Ttwo{5.0}
+  % Vertical lines
+  \draw[gray, dotted] (\Pzero,0) -- (\Pzero,\Vzero);
+  \draw[gray, dotted] (\Pone,0) -- (\Pone,\Ttwo);
+  \draw[gray, dotted] (0,\Vzero) -- (\Pzero,\Vzero);
+  \draw[gray, dotted] (0,\Vone) -- (\Pone,\Vone);
+  % Labels on x-axis
+  \node[below] at (\Pzero,0) {$P_0$};
+  \node[below] at (\Pone,0) {$P_1$};
+  \node[left] at (0,\Vzero) {\small $V(P_0)$};
+  % Dots
+  \fill (\Pzero,\Vzero) circle (1.5pt);
+  \fill (\Pone,\Vone) circle (2pt);
+  \fill[red] (\Pone,\Ttwo) circle (2pt);
+  % Brace showing LVR
+  \draw[decorate, decoration={brace, amplitude=5pt, mirror}, thick]
+    (\Pone+0.1, \Vone) -- (\Pone+0.1, \Ttwo)
+    node[midway, right=8pt, align=left] {\small \textbf{LVR}\\[-2pt]\small (gap)};
+  % Labels for the two endpoints at P1
+  \node[below right] at (\Pone, \Vone) {\small $V(P_1)$ (LP on curve)};
+  \node[above right, red] at (\Pone, \Ttwo) {\small rebalancing strategy};
+\end{tikzpicture}
+\caption{LVR as the gap between the rebalancing strategy and the bonding curve. Start at $P_0$ with pool value $V(P_0)$. If the price moves to $P_1$, the bonding-curve LP ends at $V(P_1)$ (blue dot, on the curve). A rebalancing strategy that holds the same marginal exposure $x(P_0)$ throughout ends at $V(P_0) + x(P_0)(P_1 - P_0)$ (red dot, on the tangent line). Concavity guarantees the tangent dot lies above the curve dot. The vertical gap (brace) is the LVR for this single price move. Summing such gaps over a continuous price path, weighted by the second-order concavity, gives the LVR rate.}
+\label{fig:LVR-gap}
+\end{figure}
+
+\subsection{The arbitrageur}
+
+We model a single, risk-neutral, capital-unconstrained arbitrageur with the following behavior:
+\begin{itemize}[leftmargin=2em]
+\item Observes both $S_t$ (the external reference price) and $P_t$ (the pool marginal price) continuously.
+\item Pays a proportional swap fee $\gamma \in [0, 1)$ on the AMM, expressed in log-price units. A swap effectively moves the pool's marginal price by a factor $e^{\pm\gamma}$ extra in the direction opposite to the trade. The pool charges the fee on either side of the trade direction.
+\item Can submit at most one trade per block. Blocks have length $\dt > 0$. The arb's trade is executed at the block-end price $S_{(k+1)\dt}$.
+\item Trades whenever it is profitable.
+\end{itemize}
+
+\paragraph{The no-arbitrage band.}
+The fee $\gamma$ creates a band of inaction. If the pool's log-price is within $\gamma$ of the external log-price, no trade is profitable: the arb's profit from rebalancing the pool would be smaller than the fee they would pay. Outside this band, the arb trades, bringing the pool just to the edge of the band.
+
+So at block-end: either the log-discrepancy $|\log P_t - \log S_t| \le \gamma$ and the arb does nothing, or the arb trades and brings the pool to $\log P_t = \log S_t \mp \gamma$ (i.e., to distance exactly $\gamma$ from the external, on the opposite side from the direction of the move).
+
+\paragraph{Why the ``frictionless arb'' assumption is a worst case for the LP.}
+We assume zero latency, unlimited capital, and no MEV rebate to LPs. In reality, the realized LVR is strictly less than what we compute because (i) latency lets some price moves dissipate before the arb can act, (ii) capital limits make some arbs sub-optimal, and (iii) order-flow auctions rebate some arbitrage rent to LPs. So our LVR is an \emph{upper bound} on what an actual LP would pay in adverse selection.
+
+\subsection{The LVR definition}
+
+The cumulative LVR over $[0, T]$ is
+\begin{equation}\label{eq:lvr}
+\mathrm{LVR}(T) \;:=\; \int_0^T V'(P_{s-})\,dP_s \;-\; \big[V(P_T) - V(P_0)\big].
+\end{equation}
+
+We now read the two terms carefully.
+
+\paragraph{Second term: $V(P_T) - V(P_0)$.}
+The LP's mark-to-market gain. If you deposited $V(P_0)$ worth of assets into the pool at time $0$, you can withdraw $V(P_T)$ worth at time $T$. This is the LP's realized P\&L (ignoring fees collected, which we treat separately or absorb into $\gamma$).
+
+\paragraph{First term: $\int_0^T V'(P_{s-})\,dP_s$.}
+This is the gain of a hypothetical strategy that continuously holds $V'(P_{s-}) = x(P_{s-})$ units of the risky asset. Read this carefully. The strategy's risky-asset holding is \emph{the same} as the pool's risky-asset holding at every instant (by the envelope identity). The difference is that the strategy is not stuck on the bonding curve. It just holds the marginal exposure and accumulates the gain of that exposure as the price moves, by trading frictionlessly on a continuous external market.
+
+This is the \emph{rebalancing strategy}. It mirrors the LP's exposure at every instant but does so on a friction-free market.
+
+\paragraph{The gap.}
+$\mathrm{LVR}(T)$ measures how much the rebalancing strategy outperforms the bonding-curve LP. By the concavity argument above, this is non-negative. The LP is forced to follow the curve, while the rebalancing strategy is free to follow the tangent line. The gap accumulates as the price wanders.
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[scale=0.9]
+  % Axes
+  \draw[->] (0,0) -- (10.5,0) node[right] {$P$};
+  \draw[->] (0,0) -- (0,7.5) node[above] {$V$};
+  % V(P) = 2 sqrt(P) curve
+  \draw[thick, blue, domain=0.05:10, samples=100] plot (\x, {2*sqrt(\x)});
+  \node[blue] at (8.5, 5.3) {$V(P)$};
+  % Tangent segments (red dashed)
+  % Tangent at P_0 = 1, slope V'(1) = 1, from x=1 to x=4
+  \draw[red, dashed, thick] (1, 2) -- (4, 5);
+  % Tangent at P_1 = 4, slope V'(4) = 0.5, from x=4 to x=9
+  \draw[red, dashed, thick] (4, 4) -- (9, 6.5);
+  % Points on curve (LP path)
+  \fill[blue] (1, 2) circle (2.5pt);
+  \fill[blue] (4, 4) circle (2.5pt);
+  \fill[blue] (9, 6) circle (2.5pt);
+  % Tangent overshoot points (rebalancing endpoints)
+  \fill[red] (4, 5) circle (2pt);
+  \fill[red] (9, 6.5) circle (2pt);
+  % Vertical gap arrows (concavity bites)
+  \draw[<->, thick, gray] (4.15, 4.05) -- (4.15, 4.95);
+  \node[right, gray] at (4.2, 4.5) {\small gap$_1$};
+  \draw[<->, thick, gray] (9.15, 6.05) -- (9.15, 6.45);
+  \node[right, gray] at (9.2, 6.25) {\small gap$_2$};
+  % Dotted vertical lines from x-axis
+  \draw[gray, dotted] (1, 0) -- (1, 2);
+  \draw[gray, dotted] (4, 0) -- (4, 4);
+  \draw[gray, dotted] (9, 0) -- (9, 6);
+  % x-axis labels
+  \node[below] at (1, 0) {$P_0$};
+  \node[below] at (4, 0) {$P_1$};
+  \node[below] at (9, 0) {$P_T$};
+  % Legend
+  \node[blue] at (2.6, 1.0) {\small LP on curve};
+  \node[red] at (6.8, 7.0) {\small rebalancing tangents};
+  % Total LVR brace at right
+  \node[align=left] at (12.5, 5.0) {\small $\mathrm{LVR}(T) =$\\[-2pt] \small gap$_1$ + gap$_2$};
+\end{tikzpicture}
+\caption{LVR accumulates over a price path. The price moves from $P_0$ through $P_1$ to $P_T$. After each step, the rebalancing strategy reaches a point on the local tangent line (red dots). Its gain is $V'(P_{\text{start}}) \cdot \Delta P$. The LP only reaches the curve (blue dots). The vertical gap at each step (gap$_1$ at $P_1$, gap$_2$ at $P_T$) is the concavity bite the LP eats. Cumulative LVR is the sum of these gaps over the path. In the continuous limit with infinitely many infinitesimal steps, the sum becomes the integral $\int_0^T V'(P_{s-})\,dP_s - [V(P_T) - V(P_0)]$. That is the LVR definition in equation~\eqref{eq:lvr}.}
+\label{fig:LVR-path}
+\end{figure}
+
+\paragraph{Why this is the ``right'' notion of cost.}
+LVR is a \emph{measure-independent} quantity. It does not depend on the probability of price moves, on the LP's risk preferences, or on a hedging strategy. It is a pure quadratic-variation cost paid by the LP for being stuck on the curve. This makes LVR a natural protocol-level adverse-selection metric, distinct from venue-specific measures like fee revenue or impermanent loss vs.\ buy-and-hold.
+
+\paragraph{What ``measure-independent'' means precisely, and how we use it.}
+A \emph{probability measure} on the space of price paths assigns a likelihood to each possible trajectory of $S_t$. The SDE~\eqref{eq:sde} specifies three pieces: drift $\mu$, volatility $\sigma$, and a jump law $(\lambda, J)$. The value of the drift $\mu$ depends on which measure you work under. Under the \emph{physical measure} (the ``real'' probabilities you observe in data) $\mu$ might be the empirical average return, e.g.\ $0.50$/yr if ETH happened to appreciate by 50\% over the sample. Under an \emph{$S$-martingale measure} (where $S_t$ has zero expected return), $\mu$ takes a different value, namely $-\lambda \E[e^J - 1]$ to compensate for the jump-induced drift. Both measures describe the same underlying process. They differ only in how they re-weight paths and hence in the value assigned to $\mu$.
+
+The diffusion volatility $\sigma$ and the jump law $(\lambda, m, \delta)$ are \emph{invariant} under any equivalent change of measure. They describe the second-order and discontinuous structure of paths, which all measures agree on. \emph{Measure-independence of LVR} is the statement that $\ell$ depends only on these invariant pieces and not on $\mu$. This is intuitive once you see why. LVR is defined as the gap between the LP's mark-to-market and a rebalancing portfolio that holds $V'(P_{s-})$ units of the risky asset at every instant. Both the LP and the rebalancing portfolio ride the same drift identically. Whatever expected return is baked into $\mu$ shows up equally on both sides of the LVR comparison and cancels exactly. What remains is the concavity bite from $V$ being curved (the $\sigma^2$ piece) and from jumps (the $J$ piece). The proof of Theorem~1 makes this concrete. The term $\int V'(S_{s-})\,\mu S_{s-}\,ds$ from the drift appears symmetrically in the rebalancing integral and in the Itô expansion of $V(S_t)$, and the two contributions subtract to zero.
+
+\paragraph{How we use this property.}
+Measure-independence is what justifies a key modeling shortcut in Section~6 (the analysis of fees and discrete blocks). There we will need to compute per-block log returns and would like them to be driftless, $X_k = \sigma\sqrt{\dt}\,Z_k$ with $Z_k \sim \mathcal{N}(0,1)$. The cleanest way to achieve this is to fix $\mu = \tfrac{1}{2}\sigma^2 - \lambda m$, which makes the log-price process $\log S_t$ exactly driftless (both the diffusion contribution $\mu - \sigma^2/2$ and the jump contribution $\lambda m$ vanish). This generalizes the symmetry assumption of Milionis et al.\ (2023, Assumption~2), which sets $\mu = \tfrac{1}{2}\sigma^2$ in the pure-GBM case ($\lambda = 0$).
+
+Why is this without loss of generality? Because LVR is measure-independent. Setting $\mu = \tfrac{1}{2}\sigma^2 - \lambda m$ is equivalent to working in the specific measure under which $\log S_t$ has zero drift. Under any other measure, including the physical one with empirically-measured $\hat{\mu}$, the LVR formula is exactly the same. We are picking the most algebraically convenient measure for the per-block analysis, exploiting the fact that the result we care about does not see the choice.
+
+Concretely, when an analyst takes the formulas in this paper to a specific chain and pool, they estimate $(\sigma, \lambda, m, \delta)$ from data, not $\mu$. Whatever the empirical drift happens to be, it does not enter the LVR rate or the planner's optimum. The modeling assumption $\mu = \tfrac{1}{2}\sigma^2 - \lambda m$ is a proof-bookkeeping device, not a claim about real-world returns.
+
+\paragraph{The rate.}
+For the theorems we work with the instantaneous expected rate:
+\begin{equation}\label{eq:rate}
+\ell(t) \;:=\; \frac{\E_t[d\mathrm{LVR}_t]}{dt}.
+\end{equation}
+This is a number with units of numeraire per unit time, for example USDC per year if the numeraire is USDC. It depends on the price-process parameters $(\sigma, \lambda, m, \delta)$, the fee $\gamma$, the block time $\dt$, and the pool value $V(P_t)$.
+
+The whole paper is about how $\ell$ depends on $\dt$.
+
+\section{Theorem 1: the zero-fee LVR decomposition}\label{sec:thm1}
+
+\subsection{Statement}
+
+\begin{theorem}\label{thm:1}
+In the continuous-arbitrage limit ($\gamma = 0$, $\dt \to 0$), the pool price $P_t$ equals the reference price $S_t$ at every instant. Then for the constant-product pool value $V(P) = 2\sqrt{LP}$ under the Merton jump-diffusion~\eqref{eq:sde}, the expected LVR rate is
+\begin{equation}\label{eq:thm1}
+\ell \;=\; \underbrace{\frac{\sigma^2}{8}\,V_t}_{\text{diffusion}} \;+\; \underbrace{\frac{\lambda}{2}\,V_t\,\E\!\left[(e^{J/2} - 1)^2\right]}_{\text{jump}},
+\end{equation}
+and for $J \sim \mathcal{N}(m, \delta^2)$,
+\begin{equation}\label{eq:moment}
+\E\!\left[(e^{J/2} - 1)^2\right] \;=\; e^{m + \delta^2/2} - 2 e^{m/2 + \delta^2/8} + 1 \;\ge\; 0.
+\end{equation}
+This expression is $0$ if and only if $J \equiv 0$.
+\end{theorem}
+
+The proof has four pieces. (i) Apply the Itô–Lévy formula to $V(S_t)$. (ii) Substitute into the LVR definition. (iii) Evaluate the diffusion term using the constant-product structure. (iv) Evaluate the jump term using the elegant algebraic identity for $V$. Then take expectations using the marked-Poisson compensator and evaluate the moment for Merton jumps.
+
+\subsection{Step 1: the Itô–Lévy formula for $V(S_t)$}
+
+We apply the Itô formula for jump-diffusion processes (Cont \& Tankov 2003, Proposition~8.14, page~275) to the function $V$ and the price $S$. The formula states: for a jump-diffusion $S$ with drift, Brownian, and compound-Poisson components, and a $C^{1,2}$ function $f$,
+\begin{align*}
+f(t, S_t) - f(0, S_0) \;=\;& \int_0^t \frac{\partial f}{\partial s}(s, S_s)\,ds \;+\; \int_0^t \frac{\partial f}{\partial x}(s, S_{s-})\,dS_s \;+\; \tfrac{1}{2}\int_0^t \frac{\partial^2 f}{\partial x^2}(s, S_{s-})\,d[S, S]^c_s \\
+&+\; \sum_{0 < s \le t}\!\Big[f(s, S_s) - f(s, S_{s-}) - \Delta S_s \cdot \tfrac{\partial f}{\partial x}(s, S_{s-})\Big].
+\end{align*}
+(This is the semimartingale version, Prop~8.19, p.~280. It is algebraically equivalent to Prop~8.14 and matches the form we use.)
+
+For our $V$ (no time dependence) and our jump-diffusion $S$ (so $d[S,S]^c_s = \sigma^2 S_{s-}^2\,ds$), this specializes to
+\begin{align*}
+V(S_t) - V(S_0) \;=\;& \int_0^t V'(S_{s-})\,dS_s \\
+&+ \tfrac{1}{2}\int_0^t V''(S_{s-})\,\sigma^2 S_{s-}^2\,ds \\
+&+ \sum_{0 < s \le t}\!\Big[V(S_s) - V(S_{s-}) - V'(S_{s-})\,\Delta S_s\Big].
+\end{align*}
+
+Reading this term by term:
+\begin{enumerate}[leftmargin=2em]
+\item \emph{The dS integral} $\int_0^t V'(S_{s-})\,dS_s$. This collects the gains of the ``rebalancing strategy'' that holds $V'(S_{s-})$ units of $S$ at every instant. It is the first term of the LVR definition.
+\item \emph{The Itô correction} $\tfrac{1}{2}\int_0^t V''(S_{s-})\sigma^2 S_{s-}^2\,ds$. This is the standard ``half-times-gamma-times-vol-squared'' continuous quadratic-variation correction.
+\item \emph{The jump remainder} $\sum [V(S_s) - V(S_{s-}) - V'(S_{s-})\Delta S_s]$. At each jump, this is the gap between the actual change in $V$ and the linear (tangent-line) approximation. Concavity makes this non-positive.
+\end{enumerate}
+
+Figure~\ref{fig:itolevy} visualizes the geometric content of the three terms.
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[scale=0.95]
+  % Axes
+  \draw[->] (0,0) -- (10.5,0) node[right] {$S$ (reference price)};
+  \draw[->] (0,0) -- (0,7.0) node[above] {$V$};
+  % V(S) curve
+  \draw[thick, blue, domain=0.05:10, samples=100] plot (\x, {2*sqrt(\x)});
+  \node[blue] at (9.5, 5.4) {$V(S)$};
+
+  %% Continuous-step zoom (left side: terms 1 and 2)
+  \def\Pc{1.6}    % continuous current price
+  \def\Vc{2.530}  % V(P_c) = 2 sqrt(P_c)
+  \def\dVc{0.790} % V'(P_c) = 1/sqrt(P_c)
+  \def\dPc{1.4}   % small dS for illustration
+
+  % Mark point on curve, dotted vertical
+  \fill (\Pc, \Vc) circle (1.8pt);
+  \draw[gray, dotted] (\Pc, 0) -- (\Pc, \Vc);
+  \node[below] at (\Pc, 0) {\small $S_s$};
+
+  % dS arrow on x-axis
+  \draw[->, thick, gray] (\Pc, -0.32) -- (\Pc+\dPc, -0.32);
+  \node[gray, below] at (\Pc+\dPc/2, -0.34) {\small $dS$};
+  \draw[gray, dotted] (\Pc+\dPc, 0) -- (\Pc+\dPc, {2*sqrt(\Pc+\dPc)});
+
+  % Tangent at S_s, extended slightly past S_s + dS
+  \draw[red, dashed, thick] (\Pc-0.2, {\Vc - \dVc*0.2}) -- (\Pc+\dPc+0.2, {\Vc + \dVc*(\dPc+0.2)});
+
+  % Endpoint on curve and on tangent at S_s + dS
+  \fill[blue] (\Pc+\dPc, {2*sqrt(\Pc+\dPc)}) circle (1.5pt);
+  \fill[red] (\Pc+\dPc, {\Vc + \dVc*\dPc}) circle (1.5pt);
+
+  % Itô correction gap brace
+  \draw[<->, thick, orange] (\Pc+\dPc+0.08, {2*sqrt(\Pc+\dPc)}) -- (\Pc+\dPc+0.08, {\Vc + \dVc*\dPc});
+  \node[orange, right] at (\Pc+\dPc+0.13, {(2*sqrt(\Pc+\dPc) + {\Vc + \dVc*\dPc})/2}) {\small (2)};
+
+  %% Jump (right side: term 3)
+  \def\Stm{6}    % S_τ-
+  \def\Vtm{4.899} % V(S_τ-) = 2 sqrt(6)
+  \def\dVt{0.408} % V'(S_τ-) = 1/sqrt(6)
+  \def\St{9}     % S_τ
+  \def\Vt{6.0}   % V(S_τ) = 2 sqrt(9) = 6
+
+  % Mark S_τ- and S_τ
+  \fill (\Stm, \Vtm) circle (1.8pt);
+  \fill (\St, \Vt) circle (1.8pt);
+  \draw[gray, dotted] (\Stm, 0) -- (\Stm, \Vtm);
+  \draw[gray, dotted] (\St, 0) -- (\St, \Vt);
+  \node[below] at (\Stm, 0) {\small $S_{\tau-}$};
+  \node[below] at (\St, 0) {\small $S_\tau$};
+
+  % Jump arrow on x-axis
+  \draw[->, thick, gray] (\Stm, -0.32) -- (\St, -0.32);
+  \node[gray, below] at ({(\Stm+\St)/2}, -0.34) {\small jump $\Delta S$};
+
+  % Tangent at S_τ-, extended to S_τ
+  \draw[red, dashed, thick] (\Stm-0.3, {\Vtm - \dVt*0.3}) -- (\St+0.3, {\Vtm + \dVt*(\St-\Stm+0.3)});
+
+  % Tangent endpoint at S_τ (red)
+  \fill[red] (\St, {\Vtm + \dVt*(\St-\Stm)}) circle (1.8pt);
+
+  % Jump-remainder brace at S_τ
+  \draw[<->, thick, purple!70!black] (\St + 0.13, \Vt) -- (\St + 0.13, {\Vtm + \dVt*(\St-\Stm)});
+  \node[purple!70!black, right] at (\St + 0.20, {(\Vt + {\Vtm + \dVt*(\St-\Stm)})/2}) {\small (3)};
+
+  % Term labels (top-right area)
+  \node[red, anchor=west] at (0.4, 6.6) {\small \textbf{(1)} tangent step $V'(S)\,dS$};
+  \node[orange, anchor=west] at (0.4, 6.1) {\small \textbf{(2)} Itô correction $\tfrac{1}{2}V''\sigma^2 S^2\,ds$};
+  \node[purple!70!black, anchor=west] at (0.4, 5.6) {\small \textbf{(3)} jump remainder};
+\end{tikzpicture}
+\caption{Geometric content of the three terms in the Itô--Lévy expansion of $V(S_t) - V(S_0)$. Along a continuous diffusive step $S_s \to S_s + dS$ (left), the rebalancing strategy gains $V'(S)\,dS$ along the tangent (red dashes, term~1). The actual curve sits below the tangent. The small vertical gap (orange) is the Itô correction $\frac{1}{2}V''(S)\sigma^2 S^2\,ds$ that accumulates as a continuous integral (term~2). At a jump $S_{\tau-} \to S_\tau$ (right), the tangent extrapolated by $\Delta S$ overshoots the curve by a finite amount. The vertical gap (purple) is the discrete \emph{jump remainder} $V(S_\tau) - V(S_{\tau-}) - V'(S_{\tau-})\Delta S$ (term~3). Both gaps are non-negative because $V$ is concave: the same mechanism, taken continuously for term~2 and discretely for term~3.}
+\label{fig:itolevy}
+\end{figure}
+
+\subsection{Step 2: substitute into the LVR definition}
+
+The LVR over $[0, t]$ is, by definition,
+\[
+\mathrm{LVR}(t) \;=\; \int_0^t V'(P_{s-})\,dP_s - [V(P_t) - V(P_0)].
+\]
+In the continuous-arbitrage limit $P_t \equiv S_t$, so this becomes
+\[
+\mathrm{LVR}(t) \;=\; \int_0^t V'(S_{s-})\,dS_s - [V(S_t) - V(S_0)].
+\]
+Substitute the Itô–Lévy expansion of $V(S_t) - V(S_0)$:
+\begin{align*}
+\mathrm{LVR}(t) \;=\;& \int_0^t V'(S_{s-})\,dS_s \;-\; \int_0^t V'(S_{s-})\,dS_s \\
+& \;-\; \tfrac{1}{2}\int_0^t V''(S_{s-})\sigma^2 S_{s-}^2\,ds \\
+& \;-\; \sum_{0 < s \le t}\big[V(S_s) - V(S_{s-}) - V'(S_{s-})\Delta S_s\big].
+\end{align*}
+The first two terms cancel. What remains:
+\begin{equation}\label{eq:lvr-decomp}
+\mathrm{LVR}(t) \;=\; -\tfrac{1}{2}\int_0^t V''(S_{s-})\,\sigma^2 S_{s-}^2\,ds \;-\; \sum_{0 < s \le t}\!\Big[V(S_s) - V(S_{s-}) - V'(S_{s-})\,\Delta S_s\Big].
+\end{equation}
+
+Both terms are non-negative:
+\begin{itemize}[leftmargin=2em]
+\item The integral term has $V''(S) < 0$ (concavity), so the integrand $-\tfrac{1}{2}V''\sigma^2 S^2 > 0$.
+\item Each summand in the jump term: by concavity, $V(S_s) \le V(S_{s-}) + V'(S_{s-})\Delta S_s$ (the tangent line at $S_{s-}$ overestimates $V$ at the post-jump point $S_s$), so $V(S_s) - V(S_{s-}) - V'(S_{s-})\Delta S_s \le 0$, and the negative of this is $\ge 0$.
+\end{itemize}
+
+So $\mathrm{LVR}(t) \ge 0$ always. The LP always loses to (or ties with) the rebalancing strategy.
+
+\subsection{Step 3: evaluate the diffusion term for constant-product}
+
+We need to compute $-\tfrac{1}{2}V''(P)\sigma^2 P^2$ when $V(P) = 2\sqrt{LP}$. We computed $V''(P) = -x(P)/(2P)$ earlier. Substitute:
+\[
+-\tfrac{1}{2}V''(P)\sigma^2 P^2 \;=\; -\tfrac{1}{2}\cdot \Big(-\frac{x(P)}{2P}\Big)\cdot \sigma^2 P^2 \;=\; \frac{\sigma^2}{4}\,P\,x(P).
+\]
+Now substitute $x(P) = \sqrt{L/P}$:
+\[
+\frac{\sigma^2}{4}\,P \cdot \sqrt{L/P} \;=\; \frac{\sigma^2}{4}\,\sqrt{P^2 \cdot L/P} \;=\; \frac{\sigma^2}{4}\,\sqrt{LP} \;=\; \frac{\sigma^2}{4}\cdot \frac{V(P)}{2} \;=\; \frac{\sigma^2}{8}\,V(P),
+\]
+using $V(P) = 2\sqrt{LP}$ in the third step. So the instantaneous diffusion-LVR rate is
+\begin{equation}\label{eq:diff-rate}
+\ell_{\text{diff}}(P) \;=\; -\tfrac{1}{2}V''(P)\sigma^2 P^2 \;=\; \frac{\sigma^2}{8}\,V(P).
+\end{equation}
+
+This is the famous Milionis et al.\ (2022) result: for Uniswap-v2, the LVR rate under GBM is $\sigma^2 V/8$.
+
+\subsection{Step 4: evaluate the jump remainder for constant-product}
+
+This is the new step. At a jump time $\tau$, let $r := e^{J_\tau}$ (so $S_\tau = S_{\tau-} \cdot r$, $\Delta S_\tau = S_{\tau-}(r - 1)$).
+
+Compute the jump-remainder bracket:
+\[
+V(S_\tau) - V(S_{\tau-}) - V'(S_{\tau-})\,\Delta S_\tau.
+\]
+Substitute $V(P) = 2\sqrt{LP}$ and $V'(P) = \sqrt{L/P}$:
+\begin{align*}
+V(S_{\tau-} r) &- V(S_{\tau-}) - V'(S_{\tau-}) \cdot S_{\tau-}(r-1) \\
+&= 2\sqrt{L S_{\tau-} r} - 2\sqrt{L S_{\tau-}} - \sqrt{L/S_{\tau-}}\cdot S_{\tau-}(r-1).
+\end{align*}
+Simplify the last term: $\sqrt{L/S_{\tau-}}\cdot S_{\tau-} = \sqrt{L \cdot S_{\tau-}^2 / S_{\tau-}} = \sqrt{L S_{\tau-}}$. So
+\[
+V(S_{\tau-} r) - V(S_{\tau-}) - V'(S_{\tau-})\,\Delta S_\tau \;=\; 2\sqrt{L S_{\tau-} r} - 2\sqrt{L S_{\tau-}} - \sqrt{L S_{\tau-}}(r - 1).
+\]
+Pull out the common factor $\sqrt{L S_{\tau-}}$:
+\[
+= \sqrt{L S_{\tau-}}\,\big[2\sqrt{r} - 2 - (r - 1)\big] \;=\; \sqrt{L S_{\tau-}}\,\big[2\sqrt{r} - r - 1\big].
+\]
+The bracket simplifies elegantly. Note that
+\[
+(\sqrt{r} - 1)^2 \;=\; r - 2\sqrt{r} + 1.
+\]
+So $2\sqrt{r} - r - 1 = -(r - 2\sqrt{r} + 1) = -(\sqrt{r} - 1)^2$.
+
+Therefore
+\[
+V(S_{\tau-} r) - V(S_{\tau-}) - V'(S_{\tau-})\,\Delta S_\tau \;=\; -\sqrt{L S_{\tau-}}\,(\sqrt{r} - 1)^2.
+\]
+Now use $\sqrt{L S_{\tau-}} = V(S_{\tau-})/2$ and $\sqrt{r} = e^{J_\tau/2}$:
+\begin{equation}\label{eq:jump-loss}
+\boxed{V(S_{\tau-} r) - V(S_{\tau-}) - V'(S_{\tau-})\,\Delta S_\tau \;=\; -\frac{V(S_{\tau-})}{2}\,(e^{J_\tau/2} - 1)^2.}
+\end{equation}
+
+This is the \emph{key algebraic identity}. For the constant-product pool, the jump remainder at each jump is exactly $-\tfrac{V}{2}(e^{J/2} - 1)^2$. Note the squared expression $(e^{J/2} - 1)^2$. It is symmetric in the sign of $J$, so up-jumps and down-jumps cost the LP the same amount (for a given $|J|$). And it is non-negative, as required by concavity.
+
+\subsection{Step 5: take expected rate via the compensator}
+
+Substituting~\eqref{eq:jump-loss} into the jump term of~\eqref{eq:lvr-decomp}:
+\begin{equation}\label{eq:jump-sum}
+-\sum_{0 < s \le t}\!\Big[V(S_s) - V(S_{s-}) - V'(S_{s-})\Delta S_s\Big] \;=\; \sum_{0 < s \le t} \frac{V(S_{s-})}{2}\,(e^{J_s/2} - 1)^2.
+\end{equation}
+The sum on the right has two random ingredients per jump: the pool value $V(S_{s-})$ just before the jump (which depends on the entire history up to time $s$) and the log-jump size $J_s$ (which is a fresh independent draw at the jump). We need the expectation of this sum, divided by $t$, to extract the rate.
+
+The tool is the \textbf{marked-Poisson compensator formula} from Cont \& Tankov (2003, Prop.~8.8, p.~262).\footnote{Cont \& Tankov build up the compensated integral and the intensity measure $\lambda\,\nu(dy)\,ds$ in three layers. Reading them in order shows where each piece comes from. \emph{(1) The 1D compensated Poisson process} (\S2.5.4, p.~\textasciitilde80) defines $\tilde N_t = N_t - \lambda t$ as a martingale and calls $\lambda t$ the ``compensator of $N_t$.'' \emph{(2) Compensated Poisson random measure} (\S2.6.1, Def.~2.18, p.~\textasciitilde85, and \S2.6.2, p.~\textasciitilde88) generalizes (1) from a 1D process to a random measure $M$ on $\R^d$, defining $\tilde M(A) = M(A) - \mu(A)$ where $\mu$ is the intensity measure. \emph{(3) Compound-Poisson factorization} (\S3.2, Prop.~3.5, p.~\textasciitilde75) shows that for a compound Poisson process with rate $\lambda$ and jump-size law $\nu$, the intensity measure factorizes as $\mu(dy\,ds) = \lambda\,\nu(dy)\,ds$. This is the specific form we use. \emph{(4) Stochastic integration against $\tilde M$} (\S8.1.4). Prop.~8.7 (p.~\textasciitilde261) gives the martingale property for simple predictable integrands. Prop.~8.8 (p.~262) is the $L^2$ extension that we cite. The compensator formula $\E[\int\!\int\phi\,dM] = \E[\int\!\int\phi\,d\mu]$ is an immediate corollary of $\E[\int\!\int\phi\,d\tilde M] = 0$.} The next few paragraphs walk through how the formula applies, step by step.
+
+\paragraph{Step 5a: rewrite the sum as a random-measure integral.}
+Recall from Section~\ref{sec:setup} that the random measure $J(ds, dy)$ places a unit point mass at each $(\tau_i, J_{\tau_i})$. That is one mass for each (jump time, log-jump size) pair. Integrals against $J$ are pathwise sums:
+\[
+\int_0^t \!\int_\R \phi(s, y)\,J(ds, dy) \;=\; \sum_{\tau_i \le t} \phi(\tau_i, J_{\tau_i}).
+\]
+Our sum~\eqref{eq:jump-sum} fits this pattern with the integrand
+\[
+\phi(s, y) \;:=\; \frac{V(S_{s-})}{2}\,(e^{y/2} - 1)^2.
+\]
+So
+\begin{equation}\label{eq:sum-as-integral}
+\sum_{0 < s \le t} \frac{V(S_{s-})}{2}\,(e^{J_s/2} - 1)^2 \;=\; \int_0^t\!\int_\R \frac{V(S_{s-})}{2}\,(e^{y/2} - 1)^2\,J(ds, dy).
+\end{equation}
+This is just a notational change. The right-hand side packages the sum as an integral against the random measure. The point is to put the expression in the form the Cont--Tankov machinery is built for.
+
+\paragraph{Step 5b: state Prop 8.8 precisely.}
+The formal content of Proposition~8.8 (page~262 of Cont \& Tankov) is that for any \emph{predictable} integrand $\phi: \Omega \times [0,T] \times \R \to \R$ satisfying the square-integrability condition $\E[\int_0^t\!\int |\phi(s,y)|^2 \lambda\,\nu(dy)\,ds] < \infty$, the \emph{compensated integral}
+\[
+M_t \;:=\; \int_0^t\!\int_\R \phi(s, y)\,\big(J(ds, dy) - \lambda\,\nu(dy)\,ds\big)
+\]
+is a square-integrable martingale with mean zero. The deterministic measure $\lambda\,\nu(dy)\,ds$ that is subtracted from $J(ds, dy)$ is the \emph{compensator}: it is what is needed to subtract out the systematic part of $J$ and leave a pure noise term.
+
+The corollary we want, the so-called \emph{compensator formula}, is immediate from $\E[M_t] = 0$:
+\begin{equation}\label{eq:compensator}
+\E\!\left[\int_0^t\!\int_\R \phi(s, y)\,J(ds, dy)\right] \;=\; \E\!\left[\int_0^t\!\int_\R \phi(s, y)\,\lambda\,\nu(dy)\,ds\right].
+\end{equation}
+In words: \emph{the expected integral of $\phi$ against the random measure equals the integral of $\phi$ against the deterministic intensity measure.} The randomness of $J$ has been ``averaged out'' against the deterministic compensator.
+
+\paragraph{Step 5c: verify the integrand is predictable.}
+The compensator formula requires $\phi(s, y)$ to be \emph{predictable}. Informally, that means ``determined by what happened up to and excluding time $s$.'' Our integrand decomposes as
+\[
+\phi(s, y) \;=\; \underbrace{\frac{V(S_{s-})}{2}}_{\mathcal{F}_{s-}\text{-measurable}} \;\cdot\; \underbrace{(e^{y/2} - 1)^2}_{\text{deterministic in }y}.
+\]
+The first factor $V(S_{s-})$ is $\mathcal{F}_{s-}$-measurable (it depends only on the price history strictly before $s$, since $S_{s-}$ is the left-limit). The second factor is a fixed deterministic function of the mark $y$. So $\phi$ is jointly predictable in $(s, y)$, and the integrability condition is easily satisfied for bounded $V$ over $[0, t]$. Prop~8.8 applies.
+
+\paragraph{Step 5d: apply the compensator formula and split the integral.}
+Plug~\eqref{eq:sum-as-integral} into~\eqref{eq:compensator}:
+\[
+\E\!\left[\sum_{0 < s \le t} \frac{V(S_{s-})}{2}\,(e^{J_s/2} - 1)^2\right] \;=\; \E\!\left[\int_0^t\!\int_\R \frac{V(S_{s-})}{2}\,(e^{y/2} - 1)^2\,\lambda\,\nu(dy)\,ds\right].
+\]
+Now we can split the inner $y$-integral from the outer $s$-integral, because the integrand factorizes:
+\begin{align*}
+\E\!\left[\int_0^t\!\int_\R \frac{V(S_{s-})}{2}\,(e^{y/2} - 1)^2\,\lambda\,\nu(dy)\,ds\right]
+&\;=\; \lambda\,\E\!\left[\int_0^t \frac{V(S_{s-})}{2}\,\left(\int_\R (e^{y/2} - 1)^2\,\nu(dy)\right)\!ds\right] \\
+&\;=\; \lambda \cdot \underbrace{\int_\R (e^{y/2} - 1)^2\,\nu(dy)}_{=\,\E[(e^{J/2} - 1)^2]} \cdot \tfrac{1}{2}\,\E\!\left[\int_0^t V(S_{s-})\,ds\right].
+\end{align*}
+In the second line: the $y$-integral does not depend on $\omega$ or on $s$, so it pulls out of both the $s$-integral and the expectation. And $\int_\R (e^{y/2} - 1)^2\,\nu(dy)$ is exactly the moment $\E[(e^{J/2} - 1)^2]$ (by definition of $\nu$ as the distribution of $J$). The remaining factor $\E[\int_0^t V(S_{s-})\,ds]$ collects the expected time-integral of the pool value over the interval $[0, t]$.
+
+Putting it together:
+\begin{equation}\label{eq:compensator-applied}
+\E\!\left[\sum_{0 < s \le t} \frac{V(S_{s-})}{2}\,(e^{J_s/2} - 1)^2\right] \;=\; \frac{\lambda}{2}\,\E[(e^{J/2} - 1)^2]\,\cdot\,\E\!\left[\int_0^t V(S_{s-})\,ds\right].
+\end{equation}
+
+\paragraph{Step 5e: extract the rate.}
+Equation~\eqref{eq:compensator-applied} gives the cumulative expected jump-LVR over $[0, t]$. To get the instantaneous rate, we differentiate both sides with respect to $t$ and then condition on the present state. There are three substeps. Each one is small but worth making explicit, because the result $V_t$ (not $\E[V_t]$) sits a bit subtly.
+
+\emph{First, the Fundamental Theorem of Calculus.} For every sample path, $\int_0^t V(S_{s-})\,ds$ is an ordinary Lebesgue integral with upper limit $t$, and
+\[
+\frac{d}{dt}\int_0^t V(S_{s-})\,ds \;=\; V(S_{t-}) \;=\; V_t.
+\]
+Pathwise, the derivative at the upper limit is just the integrand evaluated at $t$.
+
+\emph{Second, move the derivative inside the expectation.} Under the standard regularity (Leibniz / dominated convergence, which holds for any process with $\E[V(S_t)] < \infty$ at each $t$),
+\[
+\frac{d}{dt}\,\E\!\left[\int_0^t V(S_{s-})\,ds\right] \;=\; \E\!\left[\frac{d}{dt}\int_0^t V(S_{s-})\,ds\right] \;=\; \E[V_t].
+\]
+At this stage we have the \emph{unconditional} rate $\frac{\lambda}{2}\,\E[V_t]\,\E[(e^{J/2}-1)^2]$. It is still an expectation over $V_t$.
+
+\emph{Third, condition on the present state.} The instantaneous rate we actually want is not the unconditional one. It is the \emph{conditional} rate given the history up to time $t$.
+\[
+\ell_{\text{jump}}(t) \;:=\; \lim_{h \to 0}\,\frac{\E_t[\mathrm{LVR}^{\text{jump}}(t+h) - \mathrm{LVR}^{\text{jump}}(t)]}{h}, \qquad \E_t[\cdot] := \E[\cdot \mid \mathcal{F}_t].
+\]
+Conditioning on $\mathcal{F}_t$ makes $V_t$ a known number (it is $\mathcal{F}_t$-measurable), so $\E_t[V_t] = V_t$ with no outer expectation. Over a small window $[t, t+h]$, the conditional expectation of the integral is $\E_t[\int_t^{t+h} V(S_{s-})\,ds] = V_t \cdot h + O(h^2)$, and dividing by $h$ leaves the leading coefficient $V_t$.
+
+By contrast, the jump-mark $J$ is \emph{not} $\mathcal{F}_t$-measurable. It is a fresh draw at the next jump, independent of the history. So the inner expectation $\E[(e^{J/2}-1)^2]$ persists.
+
+Putting the three substeps together:
+\begin{equation}\label{eq:jump-rate}
+\ell_{\text{jump}}(t) \;=\; \frac{\lambda}{2}\,V_t\,\E\!\left[(e^{J/2} - 1)^2\right].
+\end{equation}
+This is the rate \emph{at the current pool state $V_t$}, not an unconditional average over all possible $V_t$. The state-dependence is consistent with the Markov structure of $S$. Given the current value of $S_t$, the future evolution depends only on $V(S_t) = V_t$, not on the path history. It is also the natural form for the numerical illustration in Section~\ref{sec:numerics}, where $V$ is fixed at the calibration value and $\ell$ is read off as a function of that fixed state.
+
+\paragraph{What the formula is doing, in one sentence.}
+The expected sum over jumps $\sum \phi(\tau_i, J_{\tau_i})$ equals $\lambda$ times the expected time-integral of the $\nu$-average $\int \phi(s, y)\,\nu(dy)$. This is a Poisson sum factored into ``how often jumps happen'' ($\lambda$) times ``what they typically cost'' ($\int \phi\,d\nu$). For our integrand, ``how often'' is $\lambda$, ``what they typically cost'' is $\frac{V}{2}\E[(e^{J/2}-1)^2]$, and the rate is the product.
+
+\subsection{Step 6: evaluate the moment for Merton jumps}
+
+For $J \sim \mathcal{N}(m, \delta^2)$:
+\[
+\E[e^{aJ}] \;=\; e^{am + a^2 \delta^2 / 2}
+\]
+is the moment generating function. Expand:
+\[
+\E[(e^{J/2} - 1)^2] \;=\; \E[e^J - 2 e^{J/2} + 1] \;=\; \E[e^J] - 2\E[e^{J/2}] + 1.
+\]
+Apply the MGF at $a = 1$ and $a = 1/2$:
+\[
+\E[e^J] \;=\; e^{m + \delta^2 / 2}, \qquad \E[e^{J/2}] \;=\; e^{m/2 + \delta^2 / 8}.
+\]
+So
+\begin{equation}\label{eq:merton-moment}
+\E[(e^{J/2} - 1)^2] \;=\; e^{m + \delta^2 / 2} - 2 e^{m/2 + \delta^2 / 8} + 1.
+\end{equation}
+This is non-negative: $(e^{J/2} - 1)^2 \ge 0$ pathwise, so its expectation is $\ge 0$. (Or: by Jensen's inequality applied to the strictly convex map $u \mapsto (e^{u/2} - 1)^2$.) Equality holds only at the degenerate $J \equiv 0$.
+
+For small $\delta$ (the regime of empirical relevance), expand to leading order:
+\[
+e^{m + \delta^2/2} \approx 1 + m + m^2/2 + \delta^2/2, \quad
+e^{m/2 + \delta^2/8} \approx 1 + m/2 + m^2/8 + \delta^2/8,
+\]
+so
+\[
+\E[(e^{J/2}-1)^2] \;\approx\; (1 + m + m^2/2 + \delta^2/2) - 2(1 + m/2 + m^2/8 + \delta^2/8) + 1 \;=\; \frac{m^2}{4} + \frac{\delta^2}{4}.
+\]
+For symmetric ($m = 0$) Merton jumps: $\E[(e^{J/2}-1)^2] \approx \delta^2/4$.
+
+\subsection{Putting it all together}
+
+Adding the diffusion rate~\eqref{eq:diff-rate} and the jump rate~\eqref{eq:jump-rate} gives Theorem~1:
+\[
+\ell \;=\; \frac{\sigma^2}{8}\,V_t \;+\; \frac{\lambda}{2}\,V_t\,\E[(e^{J/2} - 1)^2] \;=\; \frac{\sigma^2}{8}\,V_t \;+\; \frac{\lambda}{2}\,V_t\,\big[e^{m + \delta^2/2} - 2 e^{m/2 + \delta^2/8} + 1\big].
+\]
+
+\section{The fee multiplier $F$ under GBM blocks (after Milionis et al.)}\label{sec:lem1}
+
+The GBM-with-fees LVR result that we use as the diffusion piece of Theorem~2 is established by Milionis et al.\ in their fee-and-block-time extension paper. The current paper restates the formula without proving it. This section re-derives it from scratch for self-containment and to set up the truncated-moment identity that the jump case (next section) reuses. The aim is to compute the per-block LVR contribution from diffusion alone (no jumps), with a swap fee $\gamma$ in place.
+
+\subsection{Setup within a single block}
+
+A block lasts from $k\dt$ to $(k+1)\dt$. The pool's marginal log-price is static at $\log P_{k\dt}$ throughout the block (no one trades on the AMM until the next block). The reference price evolves according to the price process. Without jumps, the log-return over the block is
+\[
+X_k \;:=\; \log\!\frac{S_{(k+1)\dt}}{S_{k\dt}} \;=\; \mu_{\text{eff}}\,\dt + \sigma\sqrt{\dt}\,Z_k,
+\]
+where $Z_k \sim \mathcal{N}(0, 1)$. We drop the drift correction at leading order in $\dt$. Its contribution to LVR is $O(\dt)$ and washes out for short blocks. So $X_k \approx \sigma\sqrt{\dt}\,Z_k$.
+
+At block-end, the arbitrageur compares the log-discrepancy $|X_k|$ to the fee $\gamma$:
+\begin{itemize}[leftmargin=2em]
+\item If $|X_k| \le \gamma$, the no-arbitrage band absorbs the move and the arb does nothing.
+\item If $|X_k| > \gamma$, the arb trades, bringing the pool's marginal log-price to distance $\gamma$ from the external. The residual log-displacement traversed is
+\[
+\xi \;:=\; |X_k| - \gamma \;>\; 0.
+\]
+\end{itemize}
+
+\subsection{The per-block LVR conditional on a trade}
+
+When the arb trades, the pool's marginal price moves by an amount that corresponds to a log-displacement $\xi$. The LP's loss is the concavity gap over that displacement.
+
+\paragraph{The LP loss as a Taylor remainder.}
+What we need is the LP loss after the arbitrageur trades. That is the residual concavity gap that the LP eats. This is the Taylor remainder of $V$ in $P$-space (\emph{not} in log-price space). For a small price move $\Delta P$,
+\[
+V(P + \Delta P) - V(P) \;=\; V'(P)\,\Delta P \;+\; \tfrac{1}{2} V''(P)\,(\Delta P)^2 \;+\; O((\Delta P)^3).
+\]
+The rebalancing strategy, holding $x(P) = V'(P)$ units of risky asset, earns exactly the linear term $V'(P)\,\Delta P$. The LP earns the full $V(P + \Delta P) - V(P)$. The LP loss (gap between the two) is the leftover second-order piece:
+\[
+\text{LP loss} \;\approx\; V'(P)\,\Delta P \;-\; \big[V(P + \Delta P) - V(P)\big] \;\approx\; -\tfrac{1}{2} V''(P)\,(\Delta P)^2.
+\]
+The minus sign keeps the loss positive (since $V'' < 0$).
+
+Now translate from price-displacement to log-displacement. A log-displacement $\xi$ corresponds, to leading order, to a price move $\Delta P = P(e^\xi - 1) \approx P\,\xi$ for small $\xi$. So $(\Delta P)^2 \approx P^2\,\xi^2$, and
+\[
+\text{LP loss} \;\approx\; -\tfrac{1}{2}\,V''(P)\,P^2\,\xi^2.
+\]
+For Uniswap-v2 we computed earlier that $V''(P)\,P^2 = -V(P)/4$. Substituting:
+\[
+-\tfrac{1}{2}\,V''(P)\,P^2 \;=\; -\tfrac{1}{2}\cdot\Big(-\frac{V(P)}{4}\Big) \;=\; \frac{V(P)}{8}.
+\]
+Therefore the LP loss per block, conditional on the arbitrageur trading, is
+\begin{equation}\label{eq:loss-per-block}
+\text{LP loss per block, conditional on } |X_k| > \gamma \;\approx\; \frac{V}{8}\,\xi^2 \;=\; \frac{V}{8}\,(|X_k| - \gamma)^2.
+\end{equation}
+The approximation suppresses $O(\xi^3)$ corrections in the pool-curvature expansion.
+
+\paragraph{Sanity check: matches the exact result.}
+For the constant-product pool we can compute the LP loss exactly for any log-move $\xi$, not just small ones. After a log-move from $P$ to $P\cdot e^\xi$:
+\begin{align*}
+\text{rebalancing-strategy value} &\;=\; V(P) + V'(P)\cdot P\,(e^\xi - 1) \;=\; V(P)\,\big[\tfrac{1}{2}(1 + e^\xi)\big], \\
+\text{LP value} &\;=\; V(P\,e^\xi) \;=\; V(P)\,e^{\xi/2}.
+\end{align*}
+Subtracting:
+\[
+\text{LP loss} \;=\; V(P)\cdot\Big[\tfrac{1}{2}(1 + e^\xi) - e^{\xi/2}\Big] \;=\; \frac{V(P)}{2}\,(e^{\xi/2} - 1)^2,
+\]
+using the identity $(1 + e^\xi)/2 - e^{\xi/2} = (e^{\xi/2} - 1)^2/2$ (verify by expanding $(e^{\xi/2})^2 - 2 e^{\xi/2} + 1$). For small $\xi$, $(e^{\xi/2} - 1)^2 \approx \xi^2/4$, so $\text{LP loss} \approx V/2 \cdot \xi^2/4 = V/8 \cdot \xi^2$, recovering~\eqref{eq:loss-per-block}.\footnote{Aside: an alternative derivation works directly in log-price. With $\ell := \log P$ and $\tilde V(\ell) := V(e^\ell)$, one finds $d^2\tilde V/d\ell^2 = V''(P)P^2 + V'(P)P = -V/4 + V/2 = V/4$, so $\tilde V$ is \emph{convex} in $\ell$ even though $V$ is concave in $P$. This is an interesting curiosity but irrelevant for LVR. The rebalancing benchmark holds $V'(P)\cdot \Delta P$, a linear-in-$P$ payoff, not a linear-in-$\ell$ payoff. So the residual is the Taylor remainder in $P$-space, not $\ell$-space. The convexity of $\tilde V$ in $\ell$ is reflecting a different quantity and does not contradict the concavity of $V$ in $P$.}
+
+\subsection{Take expectation over $X_k$}
+
+Now we compute $\E[(|X_k| - \gamma)^2 \cdot \1\{|X_k| > \gamma\}]$. Standardize: let $u = X_k / (\sigma\sqrt{\dt})$, so $u \sim \mathcal{N}(0, 1)$, and let
+\[
+z \;:=\; \frac{\gamma}{\sigma\sqrt{\dt}}.
+\]
+Then $|X_k| > \gamma \iff |u| > z$. And $|X_k| - \gamma = \sigma\sqrt{\dt}\,(|u| - z)$. So
+\[
+\E[(|X_k| - \gamma)^2 \cdot \1\{|X_k| > \gamma\}] \;=\; \sigma^2 \dt \cdot \E[(|u| - z)^2 \cdot \1\{|u| > z\}].
+\]
+By symmetry of the standard normal, $\E[(|u| - z)^2 \cdot \1\{|u| > z\}] = 2\E[(u - z)^2 \cdot \1\{u > z\}] = 2\int_z^\infty (u - z)^2 \varphi(u)\,du$, where $\varphi$ is the standard normal density.
+
+\subsection{The truncated normal moment}
+
+We need to evaluate $\int_z^\infty (u - z)^2 \varphi(u)\,du$. Expand:
+\[
+\int_z^\infty (u - z)^2 \varphi(u)\,du \;=\; \int_z^\infty (u^2 - 2zu + z^2)\,\varphi(u)\,du \;=\; M_2 - 2z\,M_1 + z^2\,M_0,
+\]
+where $M_k := \int_z^\infty u^k \varphi(u)\,du$.
+
+Compute $M_0$, $M_1$, $M_2$.
+
+\paragraph{$M_0$.} By definition of $\Phi$,
+\[
+M_0 \;=\; \int_z^\infty \varphi(u)\,du \;=\; 1 - \Phi(z) \;=\; \Phi(-z).
+\]
+\paragraph{$M_1$.} Use $\frac{d}{du}\varphi(u) = -u\,\varphi(u)$, so $u\,\varphi(u) = -\frac{d}{du}\varphi(u)$, so
+\[
+M_1 \;=\; \int_z^\infty u\,\varphi(u)\,du \;=\; \big[-\varphi(u)\big]_z^\infty \;=\; \varphi(z).
+\]
+\paragraph{$M_2$.} Use integration by parts. With $v = u$, $dw = u\,\varphi(u)\,du$, so $dv = du$ and $w = -\varphi(u)$:
+\[
+M_2 \;=\; \int_z^\infty u \cdot u\,\varphi(u)\,du \;=\; \big[-u\,\varphi(u)\big]_z^\infty + \int_z^\infty \varphi(u)\,du \;=\; z\,\varphi(z) + \Phi(-z).
+\]
+
+Putting them together:
+\begin{align*}
+\int_z^\infty (u - z)^2 \varphi(u)\,du
+&= M_2 - 2z\,M_1 + z^2\,M_0 \\
+&= [z\,\varphi(z) + \Phi(-z)] - 2z\,\varphi(z) + z^2\,\Phi(-z) \\
+&= (1 + z^2)\,\Phi(-z) - z\,\varphi(z).
+\end{align*}
+
+So
+\[
+\E[(|X_k| - \gamma)^2 \cdot \1\{|X_k| > \gamma\}] \;=\; 2\,\sigma^2 \dt \cdot \big[(1 + z^2)\Phi(-z) - z\,\varphi(z)\big].
+\]
+
+\subsection{The fee multiplier $F$}
+
+Multiplying the LP-loss prefactor $V/8$ from~\eqref{eq:loss-per-block}:
+\begin{align*}
+\E[\text{LVR per block}]
+&= \frac{V}{8} \cdot \E[(|X_k| - \gamma)^2 \cdot \1\{|X_k| > \gamma\}] \\
+&= \frac{V}{8} \cdot 2\sigma^2\dt \cdot [(1+z^2)\Phi(-z) - z\,\varphi(z)] \\
+&= \frac{\sigma^2 \dt}{8}\,V \cdot \underbrace{2[(1+z^2)\Phi(-z) - z\,\varphi(z)]}_{=: F(z)}.
+\end{align*}
+
+So the per-block expected diffusion LVR is $\tfrac{\sigma^2 \dt}{8}\,V \cdot F(z)$, where
+\begin{equation}\label{eq:F}
+\boxed{F(z) \;=\; 2\big[(1+z^2)\Phi(-z) - z\,\varphi(z)\big], \qquad z \;=\; \frac{\gamma}{\sigma\sqrt{\dt}}.}
+\end{equation}
+This is the Milionis, Moallemi, Roughgarden (2023) fee multiplier.
+
+\subsection{Properties of $F$}
+
+\paragraph{$F(0) = 1$ (zero fees).}
+At $z = 0$: $\Phi(0) = 1/2$, $\varphi(0) = 1/\sqrt{2\pi}$, so $F(0) = 2[(1)(1/2) - 0] = 1$. So the per-block LVR at zero fees is $\sigma^2 \dt V / 8$, and per unit time (divide by $\dt$) it is $\sigma^2 V / 8$. This recovers Theorem~1's diffusion piece.
+
+\paragraph{$F(z) \to 0$ as $z \to \infty$ (large fees / short blocks).}
+For large $z$, $\Phi(-z) \to 0$ exponentially fast, and so does $\varphi(z)$. So $F(z) \to 0$.
+
+More precisely, using Mill's ratio $\Phi(-z) \sim \varphi(z)/z$ for large $z$:
+\[
+F(z) \;\sim\; 2[(1+z^2) \cdot \varphi(z)/z - z\,\varphi(z)] \;=\; 2\varphi(z)/z + 2z\,\varphi(z) - 2z\,\varphi(z) \;=\; \frac{2\varphi(z)}{z}.
+\]
+So $F(z) \sim 2\varphi(z)/z$, a Gaussian tail.
+
+\paragraph{$F'(z) < 0$ on $(0, \infty)$.}
+Differentiate:
+\[
+F'(z) \;=\; 2[2z\,\Phi(-z) + (1+z^2)\cdot(-\varphi(z)) - \varphi(z) - z\,\varphi'(z)].
+\]
+Using $\varphi'(z) = -z\,\varphi(z)$:
+\[
+= 2[2z\,\Phi(-z) - (1+z^2)\,\varphi(z) - \varphi(z) + z^2\,\varphi(z)] \;=\; 2[2z\,\Phi(-z) - 2\,\varphi(z)] \;=\; 4[z\,\Phi(-z) - \varphi(z)].
+\]
+By Mill's inequality $z\,\Phi(-z) < \varphi(z)$ for $z > 0$, we have $F'(z) < 0$.
+
+So $F$ is strictly decreasing from $1$ to $0$ as $z$ goes from $0$ to $\infty$. This is what makes the fee a meaningful lever. Higher fees (larger $z$) reduce per-block LVR.
+
+\section{Lemma 2: the jump-LVR coefficient $G$}\label{sec:lem2}
+
+We now do the analog of Lemma~1 for jumps.
+
+\subsection{Setup at a jump within a block}
+
+A jump of log-size $J$ occurs at some instant within the block. If $|J| > \gamma$, the jump creates a discrepancy larger than the fee threshold. The arbitrageur trades within the same block and captures the LP loss.
+
+The LP's loss at the jump is the Taylor remainder of $V$ at log-displacement $|J| - \gamma$ (the residual after the arb pays the fee), which by the same calculation as in Lemma~1 is
+\begin{equation}\label{eq:loss-per-jump}
+\text{loss per jump, } |J| > \gamma \;\approx\; \frac{V}{8}\,(|J| - \gamma)^2.
+\end{equation}
+This is the analog of~\eqref{eq:loss-per-block}, with the diffusion-displacement $|X|$ replaced by the jump log-size $|J|$. The $V/8$ prefactor is the same because the Taylor expansion is the same. It depends only on the pool curvature, not on how the displacement arose.
+
+If $|J| \le \gamma$, the arb does not trade. The price gap persists and is dissipated by subsequent diffusion arbitrage. We charge this dissipation to the diffusion term to avoid double-counting. (Remark~5 of the main paper bounds the residual cross-term as $O(\lambda \dt \gamma^2)$, four orders of magnitude below the jump floor for empirical parameters.)
+
+\subsection{Rate via the compensator}
+
+The expected LVR rate from jumps, with the threshold $\1\{|J| > \gamma\}$, is by the same compensator argument as in Theorem~1:
+\[
+\ell_{\text{jump}}(\dt, \gamma) \;=\; \lambda\,V\,G(\gamma; m, \delta^2),
+\]
+where
+\begin{equation}\label{eq:G}
+\boxed{G(\gamma; m, \delta^2) \;:=\; \frac{1}{8}\,\E\!\left[(|J| - \gamma)^2 \cdot \1\{|J| > \gamma\}\right].}
+\end{equation}
+
+Note that this depends only on the jump distribution and the fee, not on the block time $\dt$. \emph{This is the source of the jump floor.}
+
+\subsection{Closed form for symmetric Merton jumps}
+
+For $J \sim \mathcal{N}(0, \delta^2)$, define $\zeta := \gamma/\delta$ and standardize $u = J/\delta$:
+\[
+G \;=\; \frac{1}{8}\,\E[(|J| - \gamma)^2 \cdot \1\{|J| > \gamma\}] \;=\; \frac{1}{8}\cdot 2\int_\gamma^\infty (j - \gamma)^2\,f_J(j)\,dj,
+\]
+where $f_J(j) = \varphi(j/\delta)/\delta$ is the density of $J$. Substitute $u = j/\delta$, $du = dj/\delta$:
+\[
+\int_\gamma^\infty (j - \gamma)^2\,f_J(j)\,dj \;=\; \int_\zeta^\infty (\delta u - \gamma)^2 \cdot \frac{\varphi(u)}{\delta}\,\delta\,du \;=\; \int_\zeta^\infty (\delta u - \gamma)^2 \varphi(u)\,du.
+\]
+Now $\delta u - \gamma = \delta(u - \gamma/\delta) = \delta(u - \zeta)$, so
+\[
+= \int_\zeta^\infty \delta^2 (u - \zeta)^2 \varphi(u)\,du \;=\; \delta^2 \int_\zeta^\infty (u - \zeta)^2 \varphi(u)\,du.
+\]
+By the truncated normal moment from Section~\ref{sec:lem1}:
+\[
+\int_\zeta^\infty (u - \zeta)^2 \varphi(u)\,du \;=\; (1 + \zeta^2)\Phi(-\zeta) - \zeta\,\varphi(\zeta).
+\]
+So
+\[
+G \;=\; \frac{1}{8}\cdot 2 \cdot \delta^2 \cdot [(1+\zeta^2)\Phi(-\zeta) - \zeta\,\varphi(\zeta)] \;=\; \frac{\delta^2}{4}\,\big[(1+\zeta^2)\Phi(-\zeta) - \zeta\,\varphi(\zeta)\big].
+\]
+
+This can be rewritten using $F$ from~\eqref{eq:F}:
+\begin{equation}\label{eq:G-closed}
+\boxed{G(\gamma; 0, \delta^2) \;=\; \frac{\delta^2}{4}\,\big[(1+\zeta^2)\Phi(-\zeta) - \zeta\,\varphi(\zeta)\big] \;=\; \frac{\delta^2}{8}\,F(\zeta), \qquad \zeta = \gamma/\delta.}
+\end{equation}
+
+\subsection{The structural equivalence}
+
+\eqref{eq:G-closed} is the \emph{structural equivalence} that the paper emphasizes: $G$ inherits exactly the same functional form as $F$, only evaluated at a different scale.
+
+\begin{itemize}[leftmargin=2em]
+\item $F(\gamma/(\sigma\sqrt{\dt}))$, the diffusion fee multiplier, depends on $\gamma$ scaled by the per-block diffusion size $\sigma\sqrt{\dt}$.
+\item $F(\gamma/\delta)$, the jump fee multiplier, depends on $\gamma$ scaled by the jump-size standard deviation $\delta$.
+\end{itemize}
+
+So a Poisson stream of Merton jumps with standard deviation $\delta$ acts, structurally, like a diffusion with effective per-block log-spread $\delta$. The diffusion's effective spread is $\sigma\sqrt{\dt}$, which depends on $\dt$. The jumps' effective spread is $\delta$, which does not. \emph{That} is the source of the jump floor.
+
+\subsection{Why the leading-order treatment is accurate}
+
+Both Lemma~1 and Lemma~2 use the Taylor remainder $V/8 \cdot \xi^2$ at log-displacement $\xi$, dropping $O(\xi^3)$ corrections. For empirical parameters ($\xi$ measured in basis points or low percent), the cubic and higher terms are negligible.
+
+Specifically, for $\sigma\sqrt{\dt}$, $\gamma$, $\delta$ all of order $10^{-3}$ to $5 \cdot 10^{-2}$, $\xi^3 / \xi^2 \le 5 \cdot 10^{-2}$. The leading-order approximation is accurate to a few percent.
+
+The same Taylor approximation gives, at $\gamma = 0$:
+\[
+G(0; 0, \delta^2) \;=\; \frac{\delta^2}{8}\,F(0) \;=\; \frac{\delta^2}{8}.
+\]
+Compare to the \emph{exact} Theorem~1 result $\frac{1}{2}\E[(e^{J/2}-1)^2] = \frac{\delta^2}{8} + O(\delta^4)$ (from the moment expansion at the end of Section~\ref{sec:thm1}). The two agree at leading order. The gap is $O(\delta^4)$, negligible in the empirical regime.
+
+\section{Theorem 2 and Corollary 1}\label{sec:thm2}
+
+\subsection{Combining Lemmas 1 and 2}
+
+The total LVR rate with fees $\gamma$ and block time $\dt$ is the sum of the diffusion and jump contributions:
+\begin{equation}\label{eq:thm2}
+\boxed{\ell(\dt) \;=\; \frac{\sigma^2}{8}\,V\,F\!\Big(\frac{\gamma}{\sigma\sqrt{\dt}}\Big) \;+\; \lambda\,V\,G(\gamma; m, \delta^2).}
+\end{equation}
+This is Theorem~2.
+
+\subsection{Corollary 1: the jump floor}
+
+Take $\dt \to 0$. The argument of $F$ goes to infinity, so $F \to 0$. The jump term $\lambda V G$ is constant in $\dt$. So:
+\[
+\lim_{\dt \to 0} \ell(\dt) \;=\; \lambda V \cdot G(\gamma; m, \delta^2) \;>\; 0.
+\]
+No matter how short the blocks, the LVR rate cannot fall below this floor.
+
+\section{Theorem 3: the planner's block-time optimum}\label{sec:thm3}
+
+Theorem~2 gave us $\ell(\dt)$ and Corollary~1 told us longer blocks mean more LVR. Naively this suggests we should shorten blocks indefinitely. But that ignores the real cost of producing more blocks per unit time. Every block requires validators to propose, attest, gossip, and finalize, and on a proof-of-stake chain that work is paid for via token issuance. Theorem~3 characterizes the interior optimum where the marginal LVR cost of longer blocks equals the marginal cost saving from producing fewer of them.
+
+The result has two parts. There is an explicit first-order condition pinning down $\dt^{\mathrm{opt}}$. And there is a striking comparative statics fact: $\dt^{\mathrm{opt}}$ is invariant in every jump parameter, even though the level of LVR is not.
+
+\subsection{Setup}
+
+On a proof-of-stake chain like Ethereum, the chain does not pay validators in fiat but in newly issued native tokens. The economic cost of consensus is therefore the chain's \emph{issuance rate}, not a direct dollar outlay. We model this cost as scaling with block frequency. Each block requires fixed per-block work: propagation (Decker \& Wattenhofer 2013), BLS signature aggregation (Buterin 2022 single-slot-finality notes), and view-change/commit overhead in committee-based consensus (Benhaim et al.\ 2024). Croman et al.\ (2016) identify per-block bandwidth overhead as the binding scaling constraint. Holding per-block work fixed in $\dt$, halving the block interval doubles the rate at which this work occurs, so per-unit-time operational cost scales as $1/\dt$. The simplest specification consistent with this is
+\[
+R(\dt) \;=\; \frac{R_1}{\dt},
+\]
+where $R_1$ is the per-block chain-level operational cost.
+
+\paragraph{From chain-level cost to per-pool cost.}
+The chain's issuance is paid out in aggregate, but the planner's problem concerns a representative pool. The natural attribution rule is by \emph{share of value secured}. The consensus protocol secures the entire value-at-stake on the network, and a pool with TVL $V$ benefits in proportion to $V$. For a chain of native-token market cap $V_{\text{chain}}$,
+\[
+c(\dt) \;=\; R(\dt) \cdot \frac{V}{V_{\text{chain}}} \;=\; \frac{c}{\dt}, \qquad c \;:=\; R_1 \cdot \frac{V}{V_{\text{chain}}}.
+\]
+The planner's per-unit-time social cost rate is
+\[
+W(\dt) \;:=\; \ell(\dt) \;+\; \frac{c}{\dt}.
+\]
+
+\paragraph{Order of magnitude.}
+At an ETH market capitalization of $\sim$\$$208$B, Ethereum's gross consensus issuance is roughly $\sim$\$$1.7$B/yr. Drake's proposal places the security-optimal staked share at $\sim$$1/4$ of total supply. Current Ethereum runs at $\sim$$30\%$ staked, so it overpays validators by a factor $30\%/25\% = 1.2$. The implied minimum-viable issuance approximating true operational cost is $0.83 \times \$1.7$B $\approx \$1.4$B/yr. Attributing pro-rata to a pool of TVL $V = \$1$M against $V_{\text{chain}} = \$208$B gives $V/V_{\text{chain}} = 4.8 \times 10^{-6}$, so the per-pool rate is $\$1.4$B $\times 4.8 \times 10^{-6} \approx \$6{,}750$/yr per \$1M of pool TVL. Dividing by $\sim 2.6 \times 10^6$ blocks/yr gives $c \approx 260 \times 10^{-5}$ USD per block per \$1M TVL. That is the baseline used in Section~\ref{sec:numerics}.
+
+\paragraph{The tradeoff.}
+Two opposing forces shape $W$:
+\begin{itemize}[leftmargin=2em]
+\item \emph{LVR cost} $\ell(\dt)$ increases with $\dt$ (longer blocks, more stale-price exploitation), approaching the jump floor $\lambda V G$ as $\dt \to 0$.
+\item \emph{Block-production cost} $c/\dt$ decreases with $\dt$, diverging as $\dt \to 0$.
+\end{itemize}
+As $\dt \to 0$, $W \to \infty$. As $\dt \to \infty$, $W$ approaches the diffusion ceiling $\sigma^2 V/8 + \lambda V G$. Between these limits $W$ has an interior minimum at some $\dt^{\mathrm{opt}}$, pictured in Figure~\ref{fig:planner}.
+
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}[scale=1.0]
+  % Axes
+  \draw[->] (0,0) -- (8.5,0) node[right] {$\dt$ (block time)};
+  \draw[->] (0,0) -- (0,5.5) node[above] {cost rate};
+  % LVR curve ell(dt): increasing, starting near floor, approaching ceiling
+  % Use ell(dt) = floor + (ceiling - floor) * (1 - exp(-dt/tau))
+  % floor = 0.5, ceiling = 3.5, tau = 2
+  \draw[thick, blue, domain=0.05:8, samples=80] plot (\x, {0.5 + 3.0*(1 - exp(-\x/2))});
+  \node[blue] at (7.5, 3.7) {$\ell(\dt)$};
+  % c/dt curve: hyperbola
+  \draw[thick, red, domain=0.4:8, samples=80] plot (\x, {2.0/\x});
+  \node[red] at (5.5, 0.45) {$c/\dt$};
+  % W(dt) = sum
+  \draw[thick, black, domain=0.4:8, samples=80] plot (\x, {0.5 + 3.0*(1 - exp(-\x/2)) + 2.0/\x});
+  \node[black] at (7.5, 4.7) {$W(\dt) = \ell + c/\dt$};
+  % Mark optimum approximately at dt = 1.6 (where d/dt(W) = 0)
+  % Numerically: ell'(1.6) = 3/2 exp(-0.8) = 0.674, c/dt^2 at 1.6 = 2/2.56 = 0.781. So slightly larger dt.
+  % Let's try dt = 1.85: ell' = 1.5 exp(-0.925) = 0.595, c/dt^2 = 2/3.42 = 0.585. Match.
+  \def\dtopt{1.85}
+  \def\Wopt{2.945}  % 0.5 + 3.0*(1 - exp(-0.925)) + 2.0/1.85 ≈ 0.5 + 1.811 + 1.081 ≈ 3.39
+  \draw[gray, dotted] (\dtopt, 0) -- (\dtopt, 3.39);
+  \fill[black] (\dtopt, 3.39) circle (2.5pt);
+  \node[below] at (\dtopt, 0) {$\dt^{\mathrm{opt}}$};
+  \node[anchor=west] at (\dtopt + 0.15, 3.4) {\small $W$ minimum};
+  % Jump floor dashed line
+  \draw[blue, dashed, thin] (0.05, 0.5) -- (8, 0.5);
+  \node[blue, right] at (8, 0.5) {\small $\lambda V G$};
+\end{tikzpicture}
+\caption{The planner's tradeoff. The LVR rate $\ell(\dt)$ (blue) increases with $\dt$, starting from the jump floor $\lambda V G$ and rising toward the diffusion ceiling. The per-time block-production cost $c/\dt$ (red) decreases with $\dt$, diverging at zero. Their sum $W(\dt)$ (black) has a unique interior minimum at $\dt^{\mathrm{opt}}$. Theorem~3 pins down this minimum via an explicit first-order condition.}
+\label{fig:planner}
+\end{figure}
+
+\subsection{First-order condition}
+
+Differentiate $W$ and set to zero:
+\[
+W'(\dt) \;=\; \ell'(\dt) - \frac{c}{\dt^2} \;=\; 0 \qquad \Longleftrightarrow \qquad \ell'(\dt^{\text{opt}}) \;=\; \frac{c}{(\dt^{\text{opt}})^2}.
+\]
+The economic content of this FOC is the standard ``marginal benefit equals marginal cost'' principle. Slightly \emph{lengthening} blocks (think of nudging $\dt \to \dt + d\dt$) changes welfare by two amounts.
+\begin{itemize}[leftmargin=2em]
+\item LVR rises by $\ell'(\dt)\,d\dt$, where $\ell'(\dt) > 0$. This is the \emph{marginal LVR cost} of longer blocks.
+\item Block-production cost falls by $c/\dt^2\,d\dt$ per unit time, because fewer blocks per second need to be produced. This is the \emph{marginal cost saving}.
+\end{itemize}
+At the optimum these two marginal effects are equal. Any longer and the LVR penalty dominates. Any shorter and the extra block-production cost dominates. The FOC just sets the rates equal.
+
+\subsection{Compute $\ell'$}
+
+Only the diffusion term depends on $\dt$. The jump term $\lambda V G(\gamma; m, \delta^2)$ is constant in $\dt$ by Theorem~2 and so contributes nothing to $\ell'(\dt)$. This is more than a calculational convenience. \emph{It is the source of every striking result in Theorem~3.} Once $\ell'(\dt)$ depends only on the diffusion piece, the FOC depends only on the diffusion piece, and the jump parameters drop out entirely.
+
+Let $z(\dt) := \gamma/(\sigma\sqrt{\dt})$. Then
+\[
+\frac{dz}{d\dt} \;=\; \frac{\gamma}{\sigma} \cdot \big(-\tfrac{1}{2}\big) \dt^{-3/2} \;=\; -\frac{\gamma}{2\sigma\,\dt^{3/2}}.
+\]
+And from Section~\ref{sec:lem1}, $F'(z) = 4[z\,\Phi(-z) - \varphi(z)]$. So
+\[
+\ell'(\dt) \;=\; \frac{\sigma^2 V}{8} \cdot F'(z) \cdot \frac{dz}{d\dt} \;=\; \frac{\sigma^2 V}{8} \cdot 4[z\,\Phi(-z) - \varphi(z)] \cdot \Big(-\frac{\gamma}{2\sigma\,\dt^{3/2}}\Big).
+\]
+Simplify:
+\[
+\ell'(\dt) \;=\; \frac{V\,\gamma\,\sigma}{4\,\dt^{3/2}}\,[\varphi(z) - z\,\Phi(-z)].
+\]
+The bracket $\varphi(z) - z\,\Phi(-z) > 0$ for $z > 0$ (Mill's inequality), so $\ell'(\dt) > 0$. Longer blocks always have more LVR. Good.
+
+\subsection{Simplify the FOC}
+
+Plug in: $\ell'(\dt^{\text{opt}}) = c/(\dt^{\text{opt}})^2$, so
+\[
+\frac{V\gamma\sigma}{4 \dt^{3/2}}\,[\varphi(z) - z\Phi(-z)] \;=\; \frac{c}{\dt^2}.
+\]
+Multiply both sides by $\dt^{3/2}$:
+\[
+\frac{V\gamma\sigma}{4}\,[\varphi(z) - z\Phi(-z)] \;=\; \frac{c}{\dt^{1/2}}.
+\]
+Use $\sqrt{\dt} = \gamma/(\sigma z)$ to replace $\dt^{1/2}$:
+\[
+\frac{V\gamma\sigma}{4}\,[\varphi(z) - z\Phi(-z)] \;=\; \frac{c\,\sigma z}{\gamma}.
+\]
+Divide both sides by $V \gamma \sigma / 4$:
+\[
+\varphi(z) - z\,\Phi(-z) \;=\; \frac{4cz}{V\gamma^2}.
+\]
+Divide both sides by $z$:
+\[
+\frac{\varphi(z)}{z} - \Phi(-z) \;=\; \frac{4c}{V\gamma^2}.
+\]
+
+Define $h(z) := \varphi(z)/z - \Phi(-z)$. The FOC is
+\begin{equation}\label{eq:planner-foc}
+\boxed{h(z^{\text{opt}}) \;=\; \frac{4c}{V\gamma^2}.}
+\end{equation}
+
+\subsection{Interpreting and computing $z^{\text{opt}}$}
+
+The change-of-variables $z(\dt) := \gamma/(\sigma\sqrt{\dt})$ expresses the fee threshold $\gamma$ in units of the per-block diffusion standard deviation $\sigma\sqrt{\dt}$. It answers the question: ``how many standard deviations of within-block diffusion does the no-arbitrage band cover?'' Large $z$ means the fee is large relative to typical per-block moves, the arbitrageur rarely crosses the band, and the diffusion-LVR is heavily suppressed. Small $z$ means the fee is small relative to typical moves, the arbitrageur frequently extracts, and diffusion-LVR is near-uncapped.
+
+The planner's choice of $\dt$ is implicitly a choice of $z$. Shortening the block raises $z$ (because $\sqrt{\dt}$ shrinks), lengthening lowers it. So $z^{\text{opt}}$ is the planner's optimal value of this dimensionless fee-to-per-block-vol ratio. It is the single number that captures where, on the diffusion fee multiplier curve $F(z)$, the planner chooses to sit.
+
+\paragraph{Reading the right-hand side.}
+The first-order condition $h(z^{\text{opt}}) = 4c/(V\gamma^2)$ balances two dimensionless quantities. The left-hand side $h(z) = \varphi(z)/z - \Phi(-z)$ is the marginal LVR savings (per unit $z$) from raising $z$, derived by differentiating the diffusion fee multiplier $F$. The right-hand side $4c/(V\gamma^2)$ is a cost-to-LVR-loss ratio. It rises with the per-block cost $c$. It falls with the pool TVL $V$ (more LVR at stake means a smaller cost side). And it falls quadratically with the fee $\gamma$. A larger right-hand side (more expensive blocks per unit of LVR at stake) means the planner can afford less marginal suppression, so $z^{\text{opt}}$ falls (since $h$ is decreasing) and $\dt^{\text{opt}}$ rises. At the optimum, lengthening blocks by $d\dt$ adds exactly as many dollars of LVR per unit time as it saves in block-production cost.
+
+\paragraph{Computing $z^{\text{opt}}$.}
+The function $h$ has no closed-form inverse, so $z^{\text{opt}}$ is found by one-dimensional root-finding on $h(z) - H = 0$ with $H := 4c/(V\gamma^2)$. Two standard methods work.
+\begin{itemize}[leftmargin=2em]
+\item \emph{Bisection.} Since $h$ is strictly monotone from $+\infty$ at $z = 0^+$ to $0$ at $z = \infty$ (proved in the next subsection), any starting bracket like $[10^{-3}, 10^{3}]$ contains the root. Bisection converges in $\log_2(\text{precision})$ iterations.
+\item \emph{Newton.} Using $h'(z) = -\varphi(z)/z^2$ (also next subsection), the iteration
+\[
+z_{n+1} \;=\; z_n + z_n^2\,\frac{h(z_n) - H}{\varphi(z_n)}
+\]
+converges quadratically from any sensible starting point. For $z$ of order $1$, the empirically relevant regime, a constant initial guess $z_0 = 1$ converges in a few iterations.
+\end{itemize}
+Once $z^{\text{opt}}$ is in hand, the optimum block time follows by inversion of $z(\dt)$:
+\[
+\dt^{\text{opt}} \;=\; \frac{\gamma^2}{\sigma^2\,(z^{\text{opt}})^2}.
+\]
+The script \texttt{calibration.py} accompanying the paper does this for a grid of $c$ values via bisection on $h$. The planner-optimum table in Section~7 of the paper is generated by this routine.
+
+\subsection{Uniqueness via monotonicity of $h$}
+
+We claim $h$ is strictly decreasing on $(0, \infty)$. Differentiate. First,
+\[
+\frac{d}{dz}\Big(\frac{\varphi(z)}{z}\Big) \;=\; \frac{\varphi'(z) \cdot z - \varphi(z)}{z^2} \;=\; \frac{-z\,\varphi(z) \cdot z - \varphi(z)}{z^2} \;=\; -\varphi(z)\Big(1 + \frac{1}{z^2}\Big).
+\]
+Next, $\frac{d}{dz}[-\Phi(-z)] = -(-1)\varphi(-z) = \varphi(z)$.
+
+Sum:
+\[
+h'(z) \;=\; -\varphi(z)\Big(1 + \frac{1}{z^2}\Big) + \varphi(z) \;=\; -\frac{\varphi(z)}{z^2} \;<\; 0.
+\]
+
+\paragraph{Limits.} As $z \to 0^+$: $\varphi(z)/z \to \infty$ and $\Phi(-z) \to 1/2$, so $h(z) \to \infty$. As $z \to \infty$: $\varphi(z)/z \to 0$ and $\Phi(-z) \to 0$, so $h(z) \to 0$.
+
+So $h$ is a smooth strictly decreasing bijection from $(0, \infty)$ to $(0, \infty)$. For every $c > 0$, the FOC has a unique solution $z^{\text{opt}} > 0$, and the optimum block time is
+\[
+\dt^{\text{opt}} \;=\; \frac{\gamma^2}{\sigma^2\,(z^{\text{opt}})^2}.
+\]
+
+\subsection{Comparative statics: $\partial \dt^{\text{opt}}/\partial \lambda = 0$}
+
+The FOC~\eqref{eq:planner-foc} contains no $\lambda$, no $m$, no $\delta$. So $z^{\text{opt}}$, and hence $\dt^{\text{opt}}$, is invariant in the jump parameters.
+
+\emph{This is the formal expression of the jump floor, and the most surprising result of the paper.}
+
+\paragraph{Why is this surprising?}
+A naive intuition would say the following. If jumps make LVR worse, then maybe a planner facing more jumps should shorten blocks more aggressively to mitigate the damage. Theorem~3 says no. The planner who knows that jumps are intense and large should choose exactly the same block time as the planner who knows jumps are mild. The jump environment does not change the marginal calculus at all.
+
+\paragraph{Why is it true?}
+The jump term in $\ell(\dt)$ is constant in $\dt$. So $\frac{d}{d\dt}(\text{jump term}) = 0$. Jumps shift the level of $W$ by adding $\lambda V G$ everywhere, but they do not change the slope. The FOC $W'(\dt^{\text{opt}}) = 0$ only cares about slope, not level. Block time is a useless lever against jumps. Pulling it in either direction has no effect on the jump-LVR contribution. So jumps don't enter the planner's optimum at all.
+
+\paragraph{What this means for block-time policy.}
+Three readings, each useful.
+\begin{enumerate}[leftmargin=2em]
+\item \emph{Block-time policy informed by LVR depends only on the diffusion environment.} If you're a protocol designer deciding $\dt$ and you only care about LVR, the parameters that matter are $(\sigma, \gamma, V, c)$, \emph{not} $(\lambda, m, \delta)$. Jumps add a constant tax on every choice. They do not tilt the choice.
+\item \emph{Faster blocks aren't a tool against jump-driven adverse selection.} Whatever loss jumps create, faster blocks cannot reduce it. The jump-LVR contribution is exactly the same at 12s, 1s, 100ms, or 10ms blocks. Other tools (fee structure, batch auctions, MEV-redistribution, oracle design) have to do that work.
+\item \emph{Block-time policy is regime-conditioned.} If you're in a high-volatility regime (large $\sigma$), the diffusion-LVR contribution is large and the planner wants shorter blocks. In a low-volatility regime (small $\sigma$), the planner wants longer blocks. The jump environment alone doesn't tip the calculation either way.
+\end{enumerate}
+
+\paragraph{Caveats.}
+This $\lambda$-invariance is an artifact of the leading-order additive decomposition of Theorem~2. Higher-order corrections from the joint distribution of within-block jumps and diffusion re-introduce a small $\lambda$-dependence at sub-leading order. The paper quantifies this bias in its remark on the double-counting correction. For empirical parameters the correction is four orders of magnitude below the floor and can be ignored. The exact $\lambda$-invariance is therefore a leading-order property, not a structural symmetry.
+
+The other caveat, already stated in the policy paragraph of \S8 of the paper, is that the planner's objective $W = \ell + c/\dt$ is \emph{LVR-only}. Real block-time policy must also weigh MEV redistribution, finality, censorship resistance, and oracle freshness. These components are not modelled by $W$. So $\dt^{\mathrm{opt}}$ should be read as the LVR-side input to a broader social-welfare problem, not as a complete policy prescription.
+
+\section{Numerical sanity checks}\label{sec:numerics}
+
+The paper's Section 7 calibrates $(\sigma, \lambda, \delta)$ to Saef et al.'s 2019--2021 ETH tick-by-tick analysis and $c$ to Ethereum's gross consensus issuance:
+\[
+\sigma = 0.85/\sqrt{\text{yr}}, \quad \lambda = 120/\text{yr}, \quad m = 0, \quad \delta = 0.03, \quad \gamma = 5\cdot 10^{-4}, \quad V = 10^6\text{ USD}, \quad c = 260 \cdot 10^{-5}\text{ USD/block}.
+\]
+
+\paragraph{Diffusion ceiling.} $\sigma^2 V/8 = 0.7225 \cdot 10^6 / 8 = 9.03 \cdot 10^4$ USD/yr $= 903$ bp/yr.
+
+\paragraph{Jump floor.} With $\zeta = \gamma/\delta = 5 \cdot 10^{-4}/0.03 = 0.0167$,
+\[
+G(\gamma; 0, \delta^2) \;=\; \frac{\delta^2}{8}\,F(\zeta) \;=\; \frac{9 \cdot 10^{-4}}{8}\cdot 0.974 \;\approx\; 1.09 \cdot 10^{-4}.
+\]
+So the jump floor is $\lambda V G \approx 120 \cdot 10^6 \cdot 1.09 \cdot 10^{-4} = 13{,}080$ USD/yr $\approx 131$ bp/yr.
+
+\paragraph{Verify $F(0.0167)$.}
+$\Phi(-0.0167) \approx 0.4933$, $\varphi(0.0167) \approx 0.3989$. Then
+\[
+F(0.0167) \;=\; 2[(1 + 0.000279) \cdot 0.4933 - 0.0167 \cdot 0.3989] \;\approx\; 2[0.4934 - 0.00666] \;\approx\; 0.974.
+\]
+Matches.
+
+\paragraph{Ethereum 12s row.} $\sqrt{\dt} = \sqrt{12/(3.156 \cdot 10^7)} = 6.16 \cdot 10^{-4}$/$\sqrt{\text{yr}}$. So
+\[
+z = \gamma/(\sigma\sqrt{\dt}) = 5 \cdot 10^{-4}/(0.85 \cdot 6.16 \cdot 10^{-4}) \approx 0.954.
+\]
+$\Phi(-0.954) \approx 0.170$, $\varphi(0.954) \approx 0.253$.
+\[
+F(0.954) \;=\; 2[(1 + 0.910) \cdot 0.170 - 0.954 \cdot 0.253] \;\approx\; 2[0.325 - 0.241] \;\approx\; 0.166.
+\]
+Diffusion contribution: $\sigma^2 V F/8 = 903 \cdot 0.166 \approx 150$ bp/yr.
+Total: $150 + 131 \approx 281$ bp/yr.
+Diffusion share: $150/281 \approx 0.53 = 53\%$. Matches Section 7 of the paper.
+
+\paragraph{Planner FOC.} With $c = 260 \cdot 10^{-5}$ USD/block,
+\[
+\frac{4c}{V\gamma^2} \;=\; \frac{4 \cdot 260 \cdot 10^{-5}}{10^6 \cdot 2.5 \cdot 10^{-7}} \;=\; \frac{0.0104}{0.25} \;\approx\; 0.0416.
+\]
+Solve $h(z^{\text{opt}}) = \varphi(z)/z - \Phi(-z) = 0.0416$. Try $z = 1.25$:
+$h(1.25) = \varphi(1.25)/1.25 - \Phi(-1.25) = 0.1826/1.25 - 0.1056 = 0.146 - 0.106 = 0.040$. Close.
+Refining, $z^{\text{opt}} \approx 1.25$, so
+\[
+\dt^{\text{opt}} \;=\; \gamma^2/(\sigma^2 (z^{\text{opt}})^2) \;=\; (5 \cdot 10^{-4})^2/(0.7225 \cdot 1.5625) \;\approx\; 2.22 \cdot 10^{-7}\text{ yr} \;\approx\; 7\text{ s}.
+\]
+The LP-side planner's optimum is roughly half Ethereum's 12-second slot, well above sub-second L2/app-chain timing. Matches the headline result of the paper.
+
+\section{Summary of the logical flow}
+
+\begin{enumerate}[leftmargin=2em]
+\item \textbf{Setup.} Price = Merton jump-diffusion. Pool = constant product, $V = 2\sqrt{LP}$, $V'' = -V/(4P^2)$. LVR = gap between rebalancing strategy and bonding curve.
+
+\item \textbf{Theorem 1 (zero-fee LVR).} Apply Itô–Lévy to $V(S_t)$. Substitute into LVR definition. Diffusion piece evaluates to $\sigma^2 V/8$ via the constant-product identities. Jump piece evaluates to $(\lambda V/2)\E[(e^{J/2}-1)^2]$ via the algebraic identity $V(Pr) - V(P) - V'(P)P(r-1) = -V/2 \cdot (\sqrt{r}-1)^2$ and the marked-Poisson compensator. Moment evaluates explicitly for Merton jumps.
+
+\item \textbf{Lemma 1 (fee multiplier $F$).} Block-level analysis under GBM with fee $\gamma$. Arb trades only when log-return exceeds $\gamma$. LP loses Taylor remainder $V/8 \cdot (\xi)^2$. Expectation gives $F(z) = 2[(1+z^2)\Phi(-z) - z\varphi(z)]$.
+
+\item \textbf{Lemma 2 (jump coefficient $G$).} Same Taylor remainder at jumps with $|J|>\gamma$. Rate is $\lambda V G$ with $G = (1/8)\E[(|J|-\gamma)^2 \1\{|J|>\gamma\}]$. For symmetric Merton, $G = (\delta^2/8)F(\gamma/\delta)$. Same shape as $F$ at a different scale.
+
+\item \textbf{Theorem 2.} $\ell(\dt) = (\sigma^2/8) V F(\gamma/(\sigma\sqrt{\dt})) + \lambda V G$. Diffusion term scales with $\sqrt{\dt}$. Jump term is constant in $\dt$.
+
+\item \textbf{Corollary 1 (floor).} $\lim_{\dt \to 0} \ell = \lambda V G > 0$. No block-time choice can avoid the jump floor.
+
+\item \textbf{Theorem 3 (planner).} On a proof-of-stake chain, consensus cost is paid via token issuance. Per-block work (propagation, BLS aggregation, committee commit overhead) is fixed in $\dt$, so the chain-level per-time cost rate scales as $R(\dt) = R_1/\dt$ where $R_1$ is the per-block operational cost. Attributing pro-rata to a pool by share of value secured gives $c := R_1 \cdot V/V_{\text{chain}}$, and the planner minimizes $\ell + c/\dt$. The FOC reduces to $h(z) = \varphi(z)/z - \Phi(-z) = 4c/(V\gamma^2)$. Crucially, the FOC contains no jump parameters. So $\partial \dt^{\text{opt}}/\partial(\lambda, m, \delta) = 0$.
+\end{enumerate}
+
+\section*{Notation summary}
+
+\begin{center}
+\begin{tabular}{ll}
+\toprule
+Symbol & Meaning \\
+\midrule
+$S_t$ & external reference price \\
+$P_t$ & AMM pool marginal price \\
+$\mu$, $\sigma$ & price drift, diffusion volatility \\
+$N_t$, $\lambda$ & Poisson counting process and intensity \\
+$J$, $m$, $\delta$ & log-jump size, mean, std deviation (Gaussian) \\
+$L$ & constant-product invariant: $x_t y_t = L$ \\
+$x(P)$, $y(P)$ & pool reserves at marginal price $P$ \\
+$V(P) = 2\sqrt{LP}$ & pool value in numeraire \\
+$\gamma$ & swap fee (in log-price units) \\
+$\dt$ & block time \\
+$\mathrm{LVR}(t)$ & cumulative loss-versus-rebalancing \\
+$\ell(t)$ & instantaneous expected LVR rate \\
+$z = \gamma/(\sigma\sqrt{\dt})$ & dimensionless fee/per-block-vol ratio \\
+$\zeta = \gamma/\delta$ & dimensionless fee/jump-size ratio \\
+$F(z)$ & fee multiplier for diffusion (Milionis et al. 2023) \\
+$G(\gamma; m, \delta^2)$ & jump-LVR coefficient \\
+$\dt_\times$ & diffusion-jump regime boundary \\
+$\dt^{\text{opt}}$ & planner's optimum block time \\
+$c$ & per-block production cost (planner's objective) \\
+$\Phi$, $\varphi$ & standard normal CDF and PDF \\
+$h(z) = \varphi(z)/z - \Phi(-z)$ & planner FOC left-hand side \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\end{document}

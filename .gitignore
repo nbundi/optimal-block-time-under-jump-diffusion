@@ -1,0 +1,21 @@
+# macOS
+.DS_Store
+
+# LaTeX intermediate / output files (keep .pdf)
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.toc
+
+# Workflow / scratch directories
+audits/
+.claude/
+
+# Markdown files in root (keep README.md; subfolder .md files are tracked)
+/*.md
+!/README.md
