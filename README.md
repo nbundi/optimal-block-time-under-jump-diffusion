@@ -86,7 +86,17 @@ cp arxiv/extended.tex arxiv/extended.bbl arxiv/llncs.cls arxiv/fig_*.pdf .zipsta
 *not* add `\pdfoutput=1` — current arXiv guidance is against it. Do not upload `.aux`, `.log`,
 `.out` or the built `.pdf`; the `.bbl` is the required exception. Once the identifier is issued,
 update the `bundi2026ext` entry in both `references.bib` copies (`eprint = {2609.XXXXX}` and the
-`note` TODO) and replace `[DOI]` in the provenance note in `arxiv/extended.tex`.
+`note` TODO) and replace `[DOI]` in the title footnote of `arxiv/extended.tex`.
+
+Text for the **Comments** field on the submission form:
+
+> Extended version of a paper accepted at MARBLE 2026 (Lecture Notes in Operations Research,
+> Springer); adds Appendix A with the full proofs of every numbered result and Appendix B with
+> supporting illustrations. 25 pages, 2 figures.
+
+Springer's provenance statement sits in a `\thanks{}` footnote on the title, per the convention
+for LNCS/LNOR papers on arXiv (cf. arXiv:2403.12869); the "what is new in this version" part
+belongs in the Comments field rather than the body.
 
 The companion is a standalone `article` document with its own inline bibliography:
 
