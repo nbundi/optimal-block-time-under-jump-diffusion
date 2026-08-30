@@ -616,7 +616,7 @@ def make_figures(outdir="."):
             big_jump_pending = False
             bi += 1
 
-    fig, ax = plt.subplots(figsize=(4.8, 2.75), dpi=300)
+    fig, ax = plt.subplots(figsize=(4.8, 2.55), dpi=300)
     ax.axhspan(-gamma, gamma, color=BAND, zorder=0)
     for yy in (gamma, -gamma):
         ax.axhline(yy, color=MUTED, lw=0.6, ls=(0, (4, 3)))
@@ -700,7 +700,7 @@ def make_figures(outdir="."):
     err = np.max(np.abs(preblock(zt, 0.0) - pi0(zt)))
     assert err < 5e-3 * cs / 0.333, f"lam=0 quadrature off pi_0 by {err:.2e}"
 
-    fig, axes = plt.subplots(1, 2, figsize=(4.8, 2.45), dpi=300,
+    fig, axes = plt.subplots(1, 2, figsize=(4.8, 2.30), dpi=300,
                              gridspec_kw={"width_ratios": [1, 1.25]})
     zs_lin = np.linspace(-4, 4, 801); zs_log = np.linspace(-16, 16, 1201)
     for axp, zsv, logy in ((axes[0], zs_lin, False), (axes[1], zs_log, True)):
