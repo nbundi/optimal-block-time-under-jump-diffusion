@@ -82,7 +82,12 @@ cp arxiv/extended.tex arxiv/extended.bbl arxiv/llncs.cls arxiv/fig_*.pdf .zipsta
 (cd .zipstage && zip -qr ../arxiv/sources.zip . -x '.*') && rm -rf .zipstage
 ```
 
-**arXiv submission notes.** Primary category `q-fin.TR`, cross-list `cs.GT` and `q-fin.MF`. Do
+**arXiv submission notes.** Primary category `q-fin.MF`, cross-list `q-fin.TR` and `q-fin.PR`,
+optionally `math.PR`. This follows the nearest precedents: Milionis et al. (`milionis2022automated`)
+and Nezlobin–Tassy (`nezlobin2025lvr`) are both `q-fin.MF` primary with `q-fin.TR`/`q-fin.PR`
+cross-lists. Across the LVR literature on arXiv, closed-form/stochastic-calculus papers go
+`q-fin.MF`, microstructure and empirical papers go `q-fin.TR`, and mechanism-design papers go
+`cs.GT`; this one is the first kind. `q-fin` requires an endorsement for a first-time submitter. Do
 *not* add `\pdfoutput=1` — current arXiv guidance is against it. Do not upload `.aux`, `.log`,
 `.out` or the built `.pdf`; the `.bbl` is the required exception. Once the identifier is issued,
 update the `bundi2026ext` entry in both `references.bib` copies (`eprint = {2609.XXXXX}` and the
