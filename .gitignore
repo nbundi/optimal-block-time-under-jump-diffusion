@@ -21,5 +21,6 @@ audits/
 !/README.md
 .build/
 
-# camera-ready bundle must carry its .bbl (Springer checklist)
+# submission bundles must carry their .bbl (Springer checklist; arXiv does not run BibTeX)
 !camera-ready/sources/*.bbl
+!arxiv/*.bbl
