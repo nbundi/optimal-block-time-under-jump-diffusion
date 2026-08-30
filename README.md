@@ -86,7 +86,9 @@ cp arxiv/extended.tex arxiv/extended.bbl arxiv/llncs.cls arxiv/fig_*.pdf .zipsta
 *not* add `\pdfoutput=1` — current arXiv guidance is against it. Do not upload `.aux`, `.log`,
 `.out` or the built `.pdf`; the `.bbl` is the required exception. Once the identifier is issued,
 update the `bundi2026ext` entry in both `references.bib` copies (`eprint = {2609.XXXXX}` and the
-`note` TODO) and replace `[DOI]` in the title footnote of `arxiv/extended.tex`.
+`note` TODO), then add the Version-of-Record sentence and DOI to the title footnote of
+`arxiv/extended.tex` and upload it as v2. The v1 footnote deliberately carries no DOI
+placeholder, since the MARBLE 2026 volume is not published at submission time.
 
 Text for the **Comments** field on the submission form:
 
@@ -95,8 +97,15 @@ Text for the **Comments** field on the submission form:
 > supporting illustrations. 25 pages, 2 figures.
 
 Springer's provenance statement sits in a `\thanks{}` footnote on the title, per the convention
-for LNCS/LNOR papers on arXiv (cf. arXiv:2403.12869); the "what is new in this version" part
-belongs in the Comments field rather than the body.
+for LNCS/LNOR papers on arXiv (cf. arXiv:2403.12869). The footnote keeps only a minimal statement
+of the incremental change ("it adds the proofs omitted from the published version"), which licence
+clause 4(d)(v) requires to be part of the expanded contribution itself; the fuller description of
+what is new goes in the Comments field, which is metadata and does not travel with the PDF.
+
+Nothing else in the upload set should be withheld: `extended.tex` carries no TODO, draft or
+review comments, nothing follows `\end{document}`, and neither figure embeds local paths or
+usernames (matplotlib writes only its own Creator/Producer strings). Re-check with
+`grep -n '%' arxiv/extended.tex` after any edit — arXiv distributes the source, comments included.
 
 The companion is a standalone `article` document with its own inline bibliography:
 
