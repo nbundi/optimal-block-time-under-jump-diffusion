@@ -1,8 +1,8 @@
 Loss-versus-Rebalancing (LVR) is the dominant adverse-selection cost borne by
 liquidity providers on automated market makers. Under geometric Brownian motion,
 arbitrage profit scales with the probability of a profitable block, which
-vanishes as the block time $\Delta t \to 0$ -- the standing argument for
-ever-shorter blocks. Modeling the reference price instead as a jump-diffusion, I
+vanishes as the block time $\Delta t \to 0$; this is the standing argument
+for ever-shorter blocks. Modeling the reference price instead as a jump-diffusion, I
 show that the constant-product LVR rate splits into a diffusion channel carrying
 the known multiplier $F(\gamma/(\sigma\sqrt{\Delta t}))$ and a jump channel
 $\lambda V \cdot G(\gamma;m,\delta^2)$ carrying no $\Delta t$, the two
