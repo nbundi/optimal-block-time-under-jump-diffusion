@@ -82,18 +82,21 @@ cp arxiv/extended.tex arxiv/extended.bbl arxiv/llncs.cls arxiv/fig_*.pdf .zipsta
 (cd .zipstage && zip -qr ../arxiv/sources.zip . -x '.*') && rm -rf .zipstage
 ```
 
-**arXiv submission notes.** Primary category `q-fin.MF`, cross-list `q-fin.TR` and `q-fin.PR`,
-optionally `math.PR`. This follows the nearest precedents: Milionis et al. (`milionis2022automated`)
-and Nezlobin–Tassy (`nezlobin2025lvr`) are both `q-fin.MF` primary with `q-fin.TR`/`q-fin.PR`
-cross-lists. Across the LVR literature on arXiv, closed-form/stochastic-calculus papers go
-`q-fin.MF`, microstructure and empirical papers go `q-fin.TR`, and mechanism-design papers go
-`cs.GT`; this one is the first kind. `q-fin` requires an endorsement for a first-time submitter. Do
-*not* add `\pdfoutput=1` — current arXiv guidance is against it. Do not upload `.aux`, `.log`,
-`.out` or the built `.pdf`; the `.bbl` is the required exception. Once the identifier is issued,
-update the `bundi2026ext` entry in both `references.bib` copies (`eprint = {2609.XXXXX}` and the
-`note` TODO), then add the Version-of-Record sentence and DOI to the title footnote of
-`arxiv/extended.tex` and upload it as v2. The v1 footnote deliberately carries no DOI
-placeholder, since the MARBLE 2026 volume is not published at submission time.
+**arXiv record.** Published 2026-08-31 as **[arXiv:2608.30321](https://arxiv.org/abs/2608.30321)**
+(v1), primary `q-fin.MF`, cross-listed `math.PR` and `q-fin.TR`, MSC 91G80 / 60G51 / 91B26, under the
+arXiv perpetual non-exclusive licence (Springer licence clause 4(c) forbids a Creative Commons one).
+The category choice follows the nearest precedents: Milionis et al. (`milionis2022automated`) and
+Nezlobin–Tassy (`nezlobin2025lvr`) are both `q-fin.MF` primary. Across the LVR literature on arXiv,
+closed-form/stochastic-calculus papers go `q-fin.MF`, microstructure and empirical papers go
+`q-fin.TR`, and mechanism-design papers go `cs.GT`; this one is the first kind.
+
+For any future re-upload: do *not* add `\pdfoutput=1` — current arXiv guidance is against it — and do
+not upload `.aux`, `.log`, `.out` or the built `.pdf`; the `.bbl` is the required exception. The
+abstract field is **ASCII-only**; `arxiv/abstract.txt` is kept in that form. **Still outstanding:**
+once the MARBLE 2026 volume is published, add the Version-of-Record sentence and DOI to the title
+footnote of `arxiv/extended.tex` and upload it as v2, and add the journal reference and DOI to the
+arXiv metadata (metadata edits need no new version). The v1 footnote deliberately carries no DOI
+placeholder, since the volume was not published at submission time.
 
 Text for the **Comments** field on the submission form:
 
