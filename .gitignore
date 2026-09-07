@@ -24,3 +24,8 @@ audits/
 # submission bundles must carry their .bbl (Springer checklist; arXiv does not run BibTeX)
 !camera-ready/sources/*.bbl
 !arxiv/*.bbl
+
+# Beamer intermediates
+*.nav
+*.snm
+*.vrb
