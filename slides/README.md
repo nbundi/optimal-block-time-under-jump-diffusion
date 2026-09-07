@@ -21,7 +21,7 @@ slides plus a title, five section dividers and the two closing slides.
 | Path | Purpose |
 |---|---|
 | `talk.tex` | The deck. The only file to edit for content |
-| `presentation-info.tex` | Author, institute, date, footer. Position and phone are placeholders — check them before the closing slide goes up |
+| `presentation-info.tex` | Author, institute, date, footer, and the contact block on the closing slide |
 | `figures.py` | Generates the three talk figures by importing `../code.py`, so the slides cannot drift from the paper. Needs numpy and matplotlib |
 | `fig_rate_vs_dt.pdf` | The headline picture: the two channels of `ℓ₀(Δt)`, with the jump floor as a constant band |
 | `fig_discounts.pdf` | The two fee discounts — `F(κ)` collapsing against a flat `Ψ(γ/δ)` |
