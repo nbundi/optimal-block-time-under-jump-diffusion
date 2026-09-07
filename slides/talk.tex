@@ -5,8 +5,9 @@
 %  Prices", 7th International Conference on Mathematical Research for
 %  Blockchain Economy, Cyprus, 16-18 September 2026.
 %
-%  Slot: 30 minutes including Q&A (EAI on-site presentation guide), so the
-%  deck is built for ~20 minutes of talking and ~10 of questions.
+%  Slot: 15-17 minutes of talk plus 3-5 minutes of Q&A. The main deck is
+%  16 content slides, roughly a minute each; everything cut to fit lives
+%  after \appendix as backup slides for the discussion.
 %
 %  Build:  make        (or: pdflatex talk && pdflatex talk)
 % =====================================================================
@@ -46,10 +47,6 @@
 
 % ---------------------------------------------------------------- title
 \begin{frame}[plain,noframenumbering]\titlepage\end{frame}
-
-\begin{frame}{Outline}
-  \tableofcontents
-\end{frame}
 
 % =====================================================================
 \section{The case for faster blocks}
@@ -146,7 +143,7 @@
 \end{frame}
 
 % =====================================================================
-\section{Model and the frictionless decomposition}
+\section{Two channels, and a floor}
 % =====================================================================
 
 \begin{frame}{Setup}
@@ -203,10 +200,6 @@
   \end{columns}
 \end{frame}
 
-% =====================================================================
-\section{Fees, block time, and the jump floor}
-% =====================================================================
-
 \begin{frame}{The mispricing is a persistent state}
   Write $z_t := \log(S_t/P_t)$. At a block the arbitrageur trades iff
   $|z|>\gamma$ and moves the pool to the \emph{near band edge}:
@@ -225,10 +218,6 @@
   $\xi = \mathrm{sign}(z)(|z|-\gamma)_+$, and
   $\ell(\dt) = \tfrac{1}{\dt}\E_\pi[h(\xi)]$ against the stationary law $\pi$.
 \end{frame}
-
-\figureslide[Diffusive exceedances (teal) scale with $\sigma\sqrt{\dt}$; a jump
-(orange) opens a $\dt$-independent gap, cleared in full at the next block.]%
-{A sample path of the mispricing $z_t$}{fig_mispricing_path}
 
 \begin{frame}{The two channels, separately}
   \begin{columns}[T]
@@ -315,6 +304,173 @@
 constant in $\dt$; only the pale band responds to the block schedule.]%
 {The two channels, drawn}{fig_rate_vs_dt}
 
+% =====================================================================
+\section{Numbers, and the planner's optimum}
+% =====================================================================
+
+\begin{frame}{Calibration, and the rate across deployed block times}
+  % NB: do not open this body with a brace group -- beamer would read it as the
+  % frame subtitle, which this theme does not typeset, and the text disappears.
+  \small
+  Binance ETH/USDT $5$-minute closes, Jan 2020 -- Jun 2026 ($2{,}373$ days,
+  $682{,}946$ bars): $\sigma = 0.8156$ from bipower variation;
+  $\lambda = 283.3$/yr and $\delta = 0.0192$ from Lee--Mykland at
+  $\alpha = 1\%$; $m = 0$ ($\hat m = -0.0012$, $99\%$ CI contains zero).
+  Modelling choices: $\gamma = 5$~bp (Uniswap $0.05\%$), $V = \$1$M.
+  \normalsize
+  \medskip
+  \begin{columns}[T]
+    \begin{column}{0.50\textwidth}
+      \small
+      \begin{tabular}{lrrr}
+        \toprule
+        Chain & $\dt$ & $\ell$ (bp/yr) & diff.\ share \\
+        \midrule
+        Ethereum L1 & $12$ s   & $471$ & $73\%$ \\
+        Base / OP L2 & $2$ s   & $312$ & $60\%$ \\
+        Solana      & $400$ ms & $221$ & $43\%$ \\
+        Arbitrum    & $250$ ms & $203$ & $38\%$ \\
+        App-chain   & $50$ ms  & $162$ & $23\%$ \\
+        \midrule
+        Jump floor  & ---      & $125$ & $0\%$ \\
+        \bottomrule
+      \end{tabular}
+    \end{column}
+    \begin{column}{0.47\textwidth}
+      \begin{itemize}
+        \item Ceiling $\sigma^2V/8 = 832\bpyr$; floor $\lambda VG = 125$.
+        \item A $240\times$ cut, $12$~s $\to$ $50$~ms, removes only $89\%$ of
+              the diffusion term and leaves the rate $29\%$ above the floor.
+        \item The channels are equal at $\dt_\times \approx 0.75$~s; the
+              diffusion term reaches a tenth of the floor only at
+              $\dt \approx 5.5$~ms.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Theorem 4 --- netting LVR against what a block costs}
+  Fixed per-block work gives a cost rate $R(\dt) = r/\dt$; a pool inherits
+  $c/\dt$ with $c = r\,V/V_{\text{chain}}$. The LP-side planner minimises
+  $W(\dt) = \ell_0(\dt) + c/\dt$:
+  \begin{block}{}
+    \[
+      \eta^{\mathrm{opt}}\big(1+\eta^{\mathrm{opt}}\big)^2 = \frac{V\gamma^2}{8c},
+      \qquad
+      \dt^{\mathrm{opt}} = \frac{2\gamma^2}{\sigma^2(\eta^{\mathrm{opt}})^2},
+    \]
+  \end{block}
+  a cubic with a unique positive root, closed form by Cardano.
+  \begin{itemize}
+    \item $\partial\dt^{\mathrm{opt}}/\partial\lambda =
+          \partial\dt^{\mathrm{opt}}/\partial m =
+          \partial\dt^{\mathrm{opt}}/\partial\delta = 0$: \hl{the jump
+          parameters do not enter the first-order condition}.
+    \item $\partial\dt^{\mathrm{opt}}/\partial V = 0$, exactly --- $V$ cancels,
+          since $c \propto V$. The optimum is a property of the chain and the
+          fee tier, not of the pool.
+  \end{itemize}
+  \begin{pitfall}[What the remainder does to it]
+    That invariance is a property of $\ell_0$; $\mathcal E$ carries both
+    $\lambda$ and $\dt$. Bounding it directly puts any exact minimiser in
+    $[7.3,\,9.9]$~s --- the range over which $W$ is within $1\bpyr$ of its
+    minimum anyway.
+  \end{pitfall}
+\end{frame}
+
+\figureslide[The optimum is shallow: $539 \to 533\bpyr$. Across plausible $c$ it
+runs $0.2$--$15$~s; the jump parameters move it not at all.]%
+{The objective, and its shallow optimum}{fig_welfare}
+
+% =====================================================================
+\section{What this means, and what it does not}
+% =====================================================================
+
+\begin{frame}{Policy}
+  \begin{rwexample}[Back to the two proposals]
+    Arbitrum, $2$~s $\to$ $250$~ms: $\sqrt{\dt}$ gives $65\%$, the model gives
+    $312 \to 203\bpyr$, a \hl{$35\%$} cut. EIP-7782, $12$~s $\to$ $6$~s:
+    $\sqrt{\dt}$ gives $29\%$, the model gives $471 \to 403\bpyr$, a
+    \hl{$14\%$} cut. Both price the diffusion channel as the whole loss.
+  \end{rwexample}
+  \begin{itemize}
+    \item Shortening blocks can at most close $\ell(\dt) - \lambda VG$ --- and
+          only as $\sqrt{\dt}$.
+    \item The diffusion channel stays material into the low-millisecond range.
+          \hl{So at every deployed block time, what limits block-time policy is
+          not the floor --- it is the cost of consensus.}
+    \item Once the floor does bind, the remaining LP-side levers are not the
+          schedule:
+      \begin{itemize}
+        \item fee-tier design, since the binding ratio is $\gamma/\delta$;
+        \item batch auctions, which remove the per-block arbitrage window at
+              source;
+        \item LVR-rebate designs, e.g.\ auction-managed AMMs routing
+              pool-management revenue back to LPs.
+      \end{itemize}
+  \end{itemize}
+  \begin{takeaway}
+    Jumps change what block time can \emph{achieve}, not what it should
+    \emph{be}.
+  \end{takeaway}
+\end{frame}
+
+\begin{frame}{Conclusion}
+  \begin{itemize}
+    \item \hl{$125\bpyr$} --- the jump floor. Exact for symmetric $\nu$, at
+          every block time, with no remainder.
+    \item \hl{$471\bpyr$} at Ethereum's $12$~s, $73\%$ of it in the channel the
+          schedule governs --- and that channel yields only as $\sqrt{\dt}$.
+    \item \hl{$8.4$~s} --- the LP-side optimum. A cubic; invariant in pool size
+          exactly, and in $(\lambda,m,\delta)$ below the objective's flatness.
+    \item So both proposals I opened with are right in direction, and about
+          twice too optimistic.
+  \end{itemize}
+  \begin{takeaway}
+    The rate splits into a channel the block schedule governs and one it cannot
+    touch. The floor is genuine but distant: what binds at deployed block times
+    is the cost of a block, and the lever against the floor is $\gamma/\delta$.
+  \end{takeaway}
+  {\footnotesize This is an LP-side input to a larger welfare problem, not a
+  prescription --- limitations on the backup slides. Extended version, with all
+  proofs: \weblink{https://arxiv.org/abs/2608.30321}{arXiv:2608.30321}.}
+\end{frame}
+
+\questionsslide
+
+\closingslide
+
+% =====================================================================
+%  BACKUP -- cut from the 15-17 minute deck, kept for the discussion.
+% =====================================================================
+\appendix
+
+\section{Backup}
+
+\begin{frame}{Limitations}
+  \begin{itemize}
+    \item \textbf{Objective is LP-LVR-only.} A full welfare treatment must also
+          weigh MEV redistribution, finality, censorship resistance and oracle
+          freshness --- all of which could push $\dt^{\mathrm{opt}}$ back up.
+    \item \textbf{Consensus cost.} Issuance is a chosen compensation policy, not
+          a measured resource cost; it overstates where it subsidises growth and
+          understates where MEV and fees fund validators.
+    \item \textbf{Full-range pool.} Most LVR is paid on concentrated liquidity,
+          where the two effects on $G$ run in opposite directions --- so the
+          full-range floor is not simply a lower bound there.
+    \item \textbf{Idealised arbitrageur:} unlimited capital, zero latency,
+          continuous sight of $S_t$ --- weakest exactly in the sub-second regime
+          the floor argument concerns.
+    \item \textbf{Poisson blocks,} inherited for tractability. Deterministic
+          slots give the same shape with $C = -\zeta(1/2)/\sqrt{2\pi} \approx
+          0.583$ in place of $1/\sqrt2$, and move $\dt^{\mathrm{opt}}$ by $5\%$.
+  \end{itemize}
+\end{frame}
+
+\figureslide[Diffusive exceedances (teal) scale with $\sigma\sqrt{\dt}$; a jump
+(orange) opens a $\dt$-independent gap, cleared in full at the next block.]%
+{A sample path of the mispricing $z_t$}{fig_mispricing_path}
+
 \begin{frame}{Fees split LVR --- they do not reduce it}
   In the accounting of Milionis et al., arbitrage profit and fee income sum to
   the frictionless LVR of Theorem~1. So $\ell(\dt)$ is the arbitrage half:
@@ -337,79 +493,6 @@ constant in $\dt$; only the pale band responds to the block schedule.]%
 \figureslide[The share of each channel left to the arbitrageur. $F$ collapses as
 blocks shorten; $\Psi(\gamma/\delta)$ does not move.]%
 {Two fee discounts, one lever}{fig_discounts}
-
-% =====================================================================
-\section{Calibration and magnitudes}
-% =====================================================================
-
-\begin{frame}{Calibration --- Binance ETH/USDT, Jan 2020 -- Jun 2026}
-  $2{,}373$ days, $682{,}946$ five-minute bars.
-  \begin{columns}[T]
-    \begin{column}{0.56\textwidth}
-      \small
-      \begin{tabular}{lrl}
-        \toprule
-        & value & estimator \\
-        \midrule
-        $\sigma$ & $0.8156$   & bipower variation \\
-        $\lambda$ & $283.3$/yr & Lee--Mykland, $\alpha=1\%$ \\
-        $\delta$ & $0.0192$   & detected jumps, bias-corrected \\
-        $m$      & $0$        & $\hat m = -0.0012$; $99\%$ CI $\ni 0$ \\
-        \midrule
-        $\gamma$ & $5$~bp     & Uniswap $0.05\%$ tier \\
-        $V$      & \$1M       & pool TVL \\
-        $c$      & $\$260{\times}10^{-5}$ & per block, issuance-derived \\
-        \bottomrule
-      \end{tabular}
-    \end{column}
-    \begin{column}{0.40\textwidth}
-      \begin{block}{Two anchors}
-        \begin{itemize}
-          \item diffusion ceiling $\sigma^2 V/8 = 832\bpyr$ (as $\dt\to\infty$)
-          \item jump floor $\lambda VG = 125\bpyr$ (as $\dt\to0$)
-        \end{itemize}
-      \end{block}
-      $c$: Ethereum gross issuance (${\sim}\$1.7$B/yr), scaled for staking
-      above the security-optimal $1/4$, attributed pro-rata by value secured.
-    \end{column}
-  \end{columns}
-\end{frame}
-
-\begin{frame}{The rate across deployed block times}
-  \begin{columns}[T]
-    \begin{column}{0.52\textwidth}
-      \begin{tabular}{lrrr}
-        \toprule
-        Chain & $\dt$ & $\ell$ (bp/yr) & diff.\ share \\
-        \midrule
-        Ethereum L1 & $12$ s   & $471$ & $73\%$ \\
-        Base / OP L2 & $2$ s   & $312$ & $60\%$ \\
-        Solana      & $400$ ms & $221$ & $43\%$ \\
-        Arbitrum    & $250$ ms & $203$ & $38\%$ \\
-        App-chain   & $50$ ms  & $162$ & $23\%$ \\
-        \midrule
-        Jump floor  & ---      & $125$ & $0\%$ \\
-        \bottomrule
-      \end{tabular}
-    \end{column}
-    \begin{column}{0.45\textwidth}
-      \begin{itemize}
-        \item A $240\times$ cut, $12$~s $\to$ $50$~ms, removes only $89\%$ of
-              the diffusion term and leaves the rate $29\%$ above the floor.
-        \item The channels are equal at $\dt_\times \approx 0.75$~s.
-        \item The diffusion term reaches a tenth of the floor only at
-              $\dt \approx 5.5$~ms.
-      \end{itemize}
-    \end{column}
-  \end{columns}
-  \medskip
-  \begin{pitfall}[The reset-to-zero shortcut]
-    Using $\Psi(\kappa)$ in place of $P_{\mathrm{trade}}$ --- i.e.\ assuming a
-    trade resets $z$ to $0$ rather than to the band edge --- understates the
-    diffusion term by $2.7\times$ at $12$~s, $76\times$ at $2$~s, and
-    $4{\times}10^7$ at $400$~ms.
-  \end{pitfall}
-\end{frame}
 
 \begin{frame}{Which regime a chain is in matters more than its slot}
   $\ell$ in bp/yr at $\dt = 12$~s, diffusion share in brackets:
@@ -435,62 +518,6 @@ blocks shorten; $\Psi(\gamma/\delta)$ does not move.]%
     volatility-and-jump-intensity regime, not on a single point estimate.
   \end{takeaway}
 \end{frame}
-
-% =====================================================================
-\section{The planner's block-time optimum}
-% =====================================================================
-
-\begin{frame}{Theorem 4 --- netting LVR against what a block costs}
-  Fixed per-block work (gossip, BLS aggregation, view changes) gives a cost rate
-  $R(\dt) = r/\dt$; a pool inherits $c/\dt$ with $c = r\,V/V_{\text{chain}}$.
-  The LP-side planner minimises $W(\dt) = \ell_0(\dt) + c/\dt$:
-  \begin{block}{}
-    \[
-      \eta^{\mathrm{opt}}\big(1+\eta^{\mathrm{opt}}\big)^2 = \frac{V\gamma^2}{8c},
-      \qquad
-      \dt^{\mathrm{opt}} = \frac{2\gamma^2}{\sigma^2(\eta^{\mathrm{opt}})^2},
-    \]
-  \end{block}
-  a cubic with a unique positive root, closed form by Cardano.
-  \medskip
-
-  Four sensitivities:
-  \begin{itemize}
-    \item $\partial\dt^{\mathrm{opt}}/\partial\lambda =
-          \partial\dt^{\mathrm{opt}}/\partial m =
-          \partial\dt^{\mathrm{opt}}/\partial\delta = 0$ --- \hl{the jump
-          parameters do not enter the first-order condition}.
-    \item $\partial\dt^{\mathrm{opt}}/\partial V = 0$, exactly: $V$ cancels,
-          since $c \propto V$. The optimum is a property of the chain and the
-          fee tier, not of the pool.
-    \item $\partial\dt^{\mathrm{opt}}/\partial c > 0$; and
-          $\partial\dt^{\mathrm{opt}}/\partial\gamma$ is U-shaped.
-  \end{itemize}
-\end{frame}
-
-\begin{frame}{How far does that invariance actually go?}
-  \begin{pitfall}[Honest bookkeeping]
-    The invariance in $(\lambda,m,\delta)$ is a property of $\ell_0$, whose jump
-    term is an additive constant in $\dt$. In the \emph{exact} model
-    $\mathcal E$ carries both $\lambda$ and $\dt$, so the exact first-order
-    condition is not jump-free. It is not a theorem about $\ell$.
-  \end{pitfall}
-  Bound it directly instead. Any minimiser of $\ell + c/\dt$ lies in
-  $\{\dt : W(\dt)+\mathcal E^-(\dt) \le \min_s[W(s)+\mathcal E^+(s)]\}$, which
-  at the calibration is $[7.3,\,9.9]$~s around the separated optimum
-  $\dt^{\mathrm{opt}} = 8.4$~s.
-  \medskip
-
-  \begin{takeaway}
-    That is also the range over which $W$ sits within $1\bpyr$ of its minimum
-    anyway. So: jump parameters move $\dt^{\mathrm{opt}}$ by less than the
-    flatness of the objective can resolve --- quantitative, not absolute.
-  \end{takeaway}
-\end{frame}
-
-\figureslide[$W(\dt) = \ell_0(\dt) + c/\dt$ at $c = \$260{\times}10^{-5}$/block.
-The optimum is shallow: $539 \to 533\bpyr$, a saving under $2\%$.]%
-{The objective and its optimum}{fig_welfare}
 
 \begin{frame}{What actually moves the optimum}
   \begin{columns}[T]
@@ -534,82 +561,18 @@ The optimum is shallow: $539 \to 533\bpyr$, a saving under $2\%$.]%
   \end{columns}
 \end{frame}
 
-% =====================================================================
-\section{What this means, and what it does not}
-% =====================================================================
-
-\begin{frame}{Policy}
-  \begin{rwexample}[Back to the two proposals]
-    Arbitrum, $2$~s $\to$ $250$~ms: $\sqrt{\dt}$ gives $65\%$, the model gives
-    $312 \to 203\bpyr$, a \hl{$35\%$} cut. EIP-7782, $12$~s $\to$ $6$~s:
-    $\sqrt{\dt}$ gives $29\%$, the model gives $471 \to 403\bpyr$, a
-    \hl{$14\%$} cut. Both price the diffusion channel as the whole loss.
-  \end{rwexample}
-  \begin{itemize}
-    \item Shortening blocks can at most close $\ell(\dt) - \lambda VG$ --- and
-          only as $\sqrt{\dt}$.
-    \item The diffusion channel stays material into the low-millisecond range.
-          \hl{So at every deployed block time, what limits block-time policy is
-          not the floor --- it is the cost of consensus.}
-    \item Once the floor does bind, the remaining LP-side levers are not the
-          schedule:
-      \begin{itemize}
-        \item fee-tier design, since the binding ratio is $\gamma/\delta$;
-        \item batch auctions, which remove the per-block arbitrage window at
-              source;
-        \item LVR-rebate designs, e.g.\ auction-managed AMMs routing
-              pool-management revenue back to LPs.
-      \end{itemize}
-  \end{itemize}
-  \begin{takeaway}
-    Jumps change what block time can \emph{achieve}, not what it should
-    \emph{be}.
-  \end{takeaway}
+\begin{frame}{The reset-to-zero shortcut}
+  A common simplification is to assume a trade resets the mispricing $z$ to $0$
+  rather than to the band edge $\pm\gamma$ --- i.e.\ to use $\Psi(\kappa)$ in
+  place of $P_{\mathrm{trade}} = F(\kappa)$.
+  \begin{pitfall}[It is not a small error]
+    It understates the diffusion term by $2.7\times$ at $12$~s, $76\times$ at
+    $2$~s, and $4{\times}10^7$ at $400$~ms --- because $\Psi$ has a Gaussian
+    tail where $F$ decays only algebraically.
+  \end{pitfall}
+  The persistence of the mispricing (Lemma~1) is what makes the diffusion
+  channel decay as $\sqrt{\dt}$ rather than vanish, and so it is also what
+  keeps that channel material down into the millisecond range.
 \end{frame}
-
-\begin{frame}{Limitations}
-  \begin{itemize}
-    \item \textbf{Objective is LP-LVR-only.} A full welfare treatment must also
-          weigh MEV redistribution, finality, censorship resistance and oracle
-          freshness --- all of which could push $\dt^{\mathrm{opt}}$ back up.
-          This is an input, not a prescription.
-    \item \textbf{Consensus cost.} Issuance is a chosen compensation policy, not
-          a measured resource cost; it overstates where it subsidises growth and
-          understates where MEV and fees fund validators.
-    \item \textbf{Full-range pool.} Most LVR is paid on concentrated liquidity,
-          where the two effects on $G$ run in opposite directions --- so the
-          full-range floor is not simply a lower bound there.
-    \item \textbf{Idealised arbitrageur:} unlimited capital, zero latency,
-          continuous sight of $S_t$ --- weakest exactly in the sub-second regime
-          the floor argument concerns.
-    \item \textbf{Poisson blocks,} inherited for tractability. Deterministic
-          slots give the same shape with $C = -\zeta(1/2)/\sqrt{2\pi} \approx
-          0.583$ in place of $1/\sqrt2$, and move $\dt^{\mathrm{opt}}$ by $5\%$.
-  \end{itemize}
-\end{frame}
-
-\begin{frame}{Conclusion}
-  \begin{itemize}
-    \item \hl{$125\bpyr$} --- the jump floor. Exact for symmetric $\nu$, at
-          every block time, with no remainder.
-    \item \hl{$471\bpyr$} at Ethereum's $12$~s, $73\%$ of it in the channel the
-          schedule governs --- and that channel yields only as $\sqrt{\dt}$.
-    \item \hl{$8.4$~s} --- the LP-side optimum. A cubic; invariant in pool size
-          exactly, and in $(\lambda,m,\delta)$ below the objective's flatness.
-    \item So both proposals I opened with are right in direction, and about
-          twice too optimistic.
-  \end{itemize}
-  \begin{takeaway}
-    The rate splits into a channel the block schedule governs and one it cannot
-    touch. The floor is genuine but distant: what binds at deployed block times
-    is the cost of a block, and the lever against the floor is $\gamma/\delta$.
-  \end{takeaway}
-  {\footnotesize Extended version, with all proofs:
-  \weblink{https://arxiv.org/abs/2608.30321}{arXiv:2608.30321}.}
-\end{frame}
-
-\questionsslide
-
-\closingslide
 
 \end{document}

@@ -6,15 +6,19 @@ Cyprus, 16–18 September 2026.
 
 ## Length
 
-MARBLE 2026 is co-located with EAI BlockTEA 2026 and shares its programme and speaker
-instructions. The [on-site presentation guide](https://blocktea.eai-conferences.org/2026/on-site-presentation-guide/)
-gives a **30-minute slot covering presentation and Q&A**, with slides in `.pptx` or PDF, brought on
-a USB drive or emailed to the organisers in advance. The
-[programme](https://blocktea.eai-conferences.org/2026/program/) is consistent with that: the four
-MARBLE technical sessions run 100–150 minutes each.
+**All MARBLE 2026 talks: 15–17 minutes plus 3–5 minutes of Q&A**, per the organisers.
 
-The deck is therefore built for **~20 minutes of talking**, leaving ~10 for questions: 22 content
-slides plus a title, five section dividers and the two closing slides.
+Note that the co-located EAI BlockTEA
+[on-site presentation guide](https://blocktea.eai-conferences.org/2026/on-site-presentation-guide/)
+advertises a 30-minute slot covering presentation and Q&A; the organisers' 15–17 minutes is the
+binding number and is what this deck is built for. That guide is still the source for the practical
+details: slides in `.pptx` or PDF, brought on a USB drive or emailed to the organisers in advance.
+
+The main deck is therefore **16 content slides**, roughly a minute each, plus a title, four section
+dividers and the two closing slides. Everything cut to fit lives after `\appendix` as **backup
+slides** — limitations, the mispricing sample path, the fee-split accounting, the two-discount
+figure, the (σ, λ) regime grid, the optimum's sensitivity tables, and the reset-to-zero pitfall —
+so the material is one page-forward away if a question calls for it.
 
 ## Framing
 
