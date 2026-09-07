@@ -24,6 +24,20 @@
 \newcommand{\1}{\mathbf{1}}
 \newcommand{\bpyr}{\,\text{bp/yr}}
 
+% The theme's closing slide prints a phone number; this one does not.
+\makeatletter
+\renewcommand{\closingslide}{%
+  {\zhaw@nightcanvas
+   \begin{frame}
+     \usebeamerfont{orginfo}%
+     \zhawuniversity\par\vskip 2.5mm
+     \textbf{\zhawinstitute}\par\vskip 2.5mm
+     \zhawpresenter\\\zhawposition\\\zhawaddress\\
+     \zhawemail\\\zhawweb\par
+     \vfill
+   \end{frame}}}
+\makeatother
+
 \mfooter{MARBLE 2026}
 \title{Optimal Block Time for\\ AMM Liquidity Providers\\ under Jump-Diffusion Prices}
 \subtitle{MARBLE 2026 --- 7th International Conference on\\ Mathematical Research for Blockchain Economy}
@@ -41,7 +55,24 @@
 \section{The case for faster blocks}
 % =====================================================================
 
-\begin{frame}{Where the argument for sub-second blocks comes from}
+\begin{frame}{Two live conversations about how fast a chain should be}
+  \begin{rwexample}[Arbitrum Research --- ``The power of faster blocks'' (Felten, May 2024)]
+    ``Arbitrum's $250$ millisecond block time leads to \hl{$65\%$ lower
+    arbitrage loss} compared to a $2$ second block time.'' \\
+    The scaling comes from ``a standard model known as `LVR with fees','' in
+    which ``arbitrage extraction scales with the square root of the block
+    time.''
+  \end{rwexample}
+  \begin{rwexample}[EIP-7782 ``Reduce Block Latency'' --- $12$ s $\to$ $6$ s, drafted for Glamsterdam]
+    ``More frequent blocks \hl{decrease LVR} (Loss Versus Rebalancing), which
+    improves the economics for liquidity providers. More liquidity means lower
+    spreads.''
+  \end{rwexample}
+  Both rest on the same result. Both, on the numbers below, overstate the gain
+  --- by roughly a factor of two.
+\end{frame}
+
+\begin{frame}{Where that argument comes from}
   Passive liquidity providers on an AMM lose to arbitrageurs whenever the
   external price moves --- \hl{loss-versus-rebalancing} (LVR), Milionis et
   al.\ (2022).
@@ -53,12 +84,13 @@
           $F(\kappa)$, $\kappa = \gamma/(\sigma\sqrt{\dt})$ ---
           the stationary probability that an arriving block offers a
           \emph{profitable} trade.
-    \item $F(\kappa)\to 0$ as $\dt\to 0$. Shorter blocks $\Rightarrow$ less LVR,
-          all the way down.
+    \item $F(\kappa) \sim \sigma\sqrt{\dt}/(\sqrt2\gamma) \to 0$ as $\dt\to0$.
+          That $\sqrt{\dt}$ is the $65\%$ and the $30\%$ quoted above; and it
+          says shorter blocks mean less LVR, all the way down.
   \end{itemize}
   \begin{takeaway}[The deployed prescription]
-    ``Shorten blocks.'' Solana at $400$~ms, Ethereum L2s at $2$~s,
-    app-chains chasing $50$~ms --- with LP welfare among the stated reasons.
+    ``Shorten blocks.'' Solana at $400$~ms, Ethereum L2s at $2$~s, app-chains
+    chasing $50$~ms --- with LP welfare among the stated reasons.
   \end{takeaway}
 \end{frame}
 
@@ -108,7 +140,8 @@
     \item The LP-side planner's optimum: a cubic, invariant in pool size and
           in every jump parameter (Theorem~4).
     \item ETH/USDT calibration: $471\bpyr$ at $12$~s against a floor of
-          $125$, optimum near $8$~s.
+          $125$, optimum near $8$~s --- and the two opening claims become
+          \hl{$35\%$} and \hl{$14\%$}.
   \end{enumerate}
 \end{frame}
 
@@ -506,14 +539,18 @@ The optimum is shallow: $539 \to 533\bpyr$, a saving under $2\%$.]%
 % =====================================================================
 
 \begin{frame}{Policy}
+  \begin{rwexample}[Back to the two proposals]
+    Arbitrum, $2$~s $\to$ $250$~ms: $\sqrt{\dt}$ gives $65\%$, the model gives
+    $312 \to 203\bpyr$, a \hl{$35\%$} cut. EIP-7782, $12$~s $\to$ $6$~s:
+    $\sqrt{\dt}$ gives $29\%$, the model gives $471 \to 403\bpyr$, a
+    \hl{$14\%$} cut. Both price the diffusion channel as the whole loss.
+  \end{rwexample}
   \begin{itemize}
-    \item Shortening blocks can at most close $\ell(\dt) - \lambda VG$, and
-          because $F$ decays algebraically that gap closes only as
-          $\sqrt{\dt}$.
-    \item At the calibration the diffusion channel stays material into the
-          low-millisecond range. \hl{So at every deployed block time, what
-          limits block-time policy is not the floor --- it is the cost of
-          consensus.}
+    \item Shortening blocks can at most close $\ell(\dt) - \lambda VG$ --- and
+          only as $\sqrt{\dt}$.
+    \item The diffusion channel stays material into the low-millisecond range.
+          \hl{So at every deployed block time, what limits block-time policy is
+          not the floor --- it is the cost of consensus.}
     \item Once the floor does bind, the remaining LP-side levers are not the
           schedule:
       \begin{itemize}
@@ -552,18 +589,20 @@ The optimum is shallow: $539 \to 533\bpyr$, a saving under $2\%$.]%
 \end{frame}
 
 \begin{frame}{Conclusion}
-  \setlength{\zhawbubblesize}{26mm}%
-  \vskip -3mm
-  \begin{keyfigures}
-    \keyfigure[night]{125}{bp/yr jump floor, exact}
-    \keyfigure[zhaw]{471}{bp/yr at Ethereum's 12 s}
-    \keyfigure[sky]{8.4 s}{LP-side optimum}
-  \end{keyfigures}
-  \vskip 1mm
+  \begin{itemize}
+    \item \hl{$125\bpyr$} --- the jump floor. Exact for symmetric $\nu$, at
+          every block time, with no remainder.
+    \item \hl{$471\bpyr$} at Ethereum's $12$~s, $73\%$ of it in the channel the
+          schedule governs --- and that channel yields only as $\sqrt{\dt}$.
+    \item \hl{$8.4$~s} --- the LP-side optimum. A cubic; invariant in pool size
+          exactly, and in $(\lambda,m,\delta)$ below the objective's flatness.
+    \item So both proposals I opened with are right in direction, and about
+          twice too optimistic.
+  \end{itemize}
   \begin{takeaway}
     The rate splits into a channel the block schedule governs and one it cannot
-    touch. The floor is genuine but distant --- what binds at deployed block
-    times is the cost of a block.
+    touch. The floor is genuine but distant: what binds at deployed block times
+    is the cost of a block, and the lever against the floor is $\gamma/\delta$.
   \end{takeaway}
   {\footnotesize Extended version, with all proofs:
   \weblink{https://arxiv.org/abs/2608.30321}{arXiv:2608.30321}.}

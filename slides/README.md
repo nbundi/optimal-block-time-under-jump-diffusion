@@ -13,8 +13,24 @@ a USB drive or emailed to the organisers in advance. The
 [programme](https://blocktea.eai-conferences.org/2026/program/) is consistent with that: the four
 MARBLE technical sessions run 100–150 minutes each.
 
-The deck is therefore built for **~20 minutes of talking**, leaving ~10 for questions: 21 content
+The deck is therefore built for **~20 minutes of talking**, leaving ~10 for questions: 22 content
 slides plus a title, five section dividers and the two closing slides.
+
+## Framing
+
+The talk opens on two live proposals that invoke the GBM result the paper revisits, and returns to
+them on the policy slide with the model's own numbers:
+
+- [The power of faster blocks](https://research.arbitrum.io/t/the-power-of-faster-blocks/9609)
+  (Ed Felten, Arbitrum Research, 31 May 2024) — "Arbitrum's 250 millisecond block time leads to 65%
+  lower arbitrage loss compared to a 2 second block time", from the √Δt scaling of "LVR with fees".
+  The model gives 312 → 203 bp/yr, a 35% cut.
+- [EIP-7782, Reduce Block Latency](https://eips.ethereum.org/EIPS/eip-7782) (Adams, Feist, Silva,
+  Harris; draft for Glamsterdam) — 12 s → 6 s, motivated in part because "more frequent blocks
+  decrease LVR ... which improves the economics for liquidity providers". √Δt predicts 29%; the
+  model gives 471 → 403 bp/yr, a 14% cut.
+
+Both figures are recomputed from `../code.py`, not transcribed.
 
 ## Files
 
