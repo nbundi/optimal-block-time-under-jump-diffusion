@@ -170,10 +170,6 @@
   \end{block}
 \end{frame}
 
-\figureslide[The pool--reference log gap $z_t = \log(S_t/P_t)$. Diffusive
-exceedances (teal) scale with $\sigma\sqrt{\dt}$; a jump (orange) opens a
-$\dt$-independent gap.]{What the model looks like}{fig_mispricing_path}
-
 \begin{frame}{Theorem 1 --- the zero-fee decomposition}
   In the continuous-arbitrage limit ($\gamma=0$, $\dt\to0$), $P_t \equiv S_t$
   and LVR is the It\^o--L\'evy remainder of $V(S_t)$:
@@ -206,10 +202,17 @@ $\dt$-independent gap.]{What the model looks like}{fig_mispricing_path}
   \end{columns}
 \end{frame}
 
-\begin{frame}{The mispricing is a persistent state}
-  Write $z_t := \log(S_t/P_t)$. At a block the arbitrageur trades iff
-  $|z|>\gamma$ and moves the pool to the \emph{near band edge}:
-  $z \mapsto \bound(z,-\gamma,\gamma)$ --- not to $0$.
+\begin{frame}{The mispricing process}
+  Theorem~1 had $\gamma=0$, so the pool tracked the reference exactly. Switch
+  the fee on and a \hl{state} appears between them: $z_t := \log(S_t/P_t)$.
+  \begin{itemize}
+    \item Between blocks $P$ is frozen, so $z$ inherits the dynamics of
+          $\log S$ --- diffusion \emph{and} jumps.
+    \item At a block the arbitrageur trades iff $|z| > \gamma$, and moves the
+          pool to the \emph{near band edge}: $z \mapsto
+          \bound(z,-\gamma,\gamma)$ --- \hl{not to $0$}. The mispricing
+          persists.
+  \end{itemize}
   \[
     z_t \;=\; \big(\mu-\tfrac12\sigma^2\big)t + \sigma W_t
     + \underbrace{\textstyle\sum_{k:\,T_k\le t} J_k}_{\text{exogenous, rate }\lambda}
@@ -220,9 +223,37 @@ $\dt$-independent gap.]{What the model looks like}{fig_mispricing_path}
     the band at a rate the protocol does not choose; block-triggered resets
     push it \hl{back} at a rate the protocol does choose.
   \end{takeaway}
-  Per block, loss $h(\xi) = \tfrac{V}{2}(e^{\xi/2}-1)^2$ with
-  $\xi = \mathrm{sign}(z)(|z|-\gamma)_+$, and
-  $\ell(\dt) = \tfrac{1}{\dt}\E_\pi[h(\xi)]$ against the stationary law $\pi$.
+\end{frame}
+
+\figureslide[Between blocks $z$ diffuses and jumps; each block (ticks) resets it
+to $\pm\gamma$ --- teal a diffusive exceedance, orange a jump.]%
+{The mispricing process, drawn}{fig_mispricing_path}
+
+\begin{frame}{From the process to a rate}
+  A block with pre-trade mispricing $z$ moves the pool's log-price by
+  $\xi = \mathrm{sign}(z)(|z|-\gamma)_+$, and by the computation behind
+  Theorem~1 the LP's loss is $h(\xi) = \tfrac{V}{2}(e^{\xi/2}-1)^2$. Blocks
+  are Poisson and independent of $z$, so the pre-block law is the stationary
+  law $\pi$ and
+  \[
+    \ell(\dt) \;=\; \frac{1}{\dt}\,\E_\pi\big[h(\xi)\big],
+    \qquad
+    h(\xi) \;=\; \underbrace{\tfrac{V}{8}\xi^2}_{\text{quadratic surrogate}}
+    \;+\; \tfrac{V}{2}\,\rho(\xi),
+    \quad \rho(\xi) := (e^{\xi/2}-1)^2 - \tfrac{\xi^2}{4}.
+  \]
+  Everything below is read off this one expression, and two exact facts about
+  the split carry it:
+  \begin{itemize}
+    \item $\tfrac{V}{8}\xi^2$ is \hl{convex} in $z$, which $h$ itself is not
+          --- a downward move of any size costs at most $V/2$. Convexity is what
+          the floor (Theorem~3) needs.
+    \item $\rho$ is \hl{signed} under symmetry:
+          $\tfrac12[\rho(\xi)+\rho(-\xi)] = \sum_{n\ge2}
+          \tfrac{1-2^{1-2n}}{(2n)!}\xi^{2n} \ge 0$, leading term
+          $\tfrac{7}{192}\xi^4$. So the surrogate \emph{understates} the loss,
+          and the residual is carried exactly, never discarded.
+  \end{itemize}
 \end{frame}
 
 \begin{frame}{The two channels, separately}
@@ -305,10 +336,6 @@ $\dt$-independent gap.]{What the model looks like}{fig_mispricing_path}
     the schedule, so it does \emph{not} shrink $J$.
   \end{pitfall}
 \end{frame}
-
-\figureslide[$\ell_0(\dt)$ at the ETH/USDT calibration. The dark band is
-constant in $\dt$; only the pale band responds to the block schedule.]%
-{The two channels, drawn}{fig_rate_vs_dt}
 
 % =====================================================================
 \section{Numbers, and the planner's optimum}
@@ -472,6 +499,10 @@ runs $0.2$--$15$~s; the jump parameters move it not at all.]%
           0.583$ in place of $1/\sqrt2$, and move $\dt^{\mathrm{opt}}$ by $5\%$.
   \end{itemize}
 \end{frame}
+
+\figureslide[$\ell_0(\dt)$ at the ETH/USDT calibration. The dark band is
+constant in $\dt$; only the pale band responds to the block schedule.]%
+{The two channels, drawn}{fig_rate_vs_dt}
 
 \begin{frame}{Fees split LVR --- they do not reduce it}
   In the accounting of Milionis et al., arbitrage profit and fee income sum to

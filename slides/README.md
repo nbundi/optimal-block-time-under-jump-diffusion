@@ -16,9 +16,13 @@ details: slides in `.pptx` or PDF, brought on a USB drive or emailed to the orga
 
 The main deck is therefore **17 content slides**, roughly a minute each, plus a title, four section
 dividers and the two closing slides. Everything cut to fit lives after `\appendix` as **backup
-slides** — limitations, the fee-split accounting, the two-discount figure, the (σ, λ) regime grid,
-the optimum's sensitivity tables, and the reset-to-zero pitfall — so the material is one
-page-forward away if a question calls for it.
+slides** — limitations, the two-channel plot of `ℓ₀(Δt)`, the fee-split accounting, the
+two-discount figure, the (σ, λ) regime grid, the optimum's sensitivity tables, and the
+reset-to-zero pitfall — so the material is one page-forward away if a question calls for it.
+
+The mispricing process is introduced as a single three-slide sequence — define `z`, draw it, then
+turn it into a rate — and everything after it (the two lemmas, Theorem 2, Theorem 3) builds on that
+one expression for `ℓ(Δt)`.
 
 ## Framing
 
@@ -43,10 +47,10 @@ Both figures are recomputed from `../code.py`, not transcribed.
 | `talk.tex` | The deck. The only file to edit for content |
 | `presentation-info.tex` | Author, institute, date, footer, and the contact block on the closing slide |
 | `figures.py` | Generates the three talk figures by importing `../code.py`, so the slides cannot drift from the paper. Needs numpy and matplotlib |
-| `fig_rate_vs_dt.pdf` | The headline picture: the two channels of `ℓ₀(Δt)`, with the jump floor as a constant band |
-| `fig_discounts.pdf` | The two fee discounts — `F(κ)` collapsing against a flat `Ψ(γ/δ)` |
+| `fig_rate_vs_dt.pdf` | The two channels of `ℓ₀(Δt)`, with the jump floor as a constant band (backup slide) |
+| `fig_discounts.pdf` | The two fee discounts — `F(κ)` collapsing against a flat `Ψ(γ/δ)` (backup slide) |
 | `fig_welfare.pdf` | `W(Δt) = ℓ₀(Δt) + c/Δt`, its optimum at 8.4 s and its flatness |
-| `fig_mispricing_path.pdf` | Copied from `../arxiv/`; the paper's Figure 1, shown right after the setup slide |
+| `fig_mispricing_path.pdf` | Copied from `../arxiv/`; the paper's Figure 1, the middle slide of the mispricing sequence |
 | `zhaw-theme.sty`, `zhaw_logo_*.png`, `zhaw_title_bg.jpg` | The [ZHAW beamer template](https://github.com/nbundi/zhaw-beamer-template), vendored so the folder is self-contained |
 
 ## Build
