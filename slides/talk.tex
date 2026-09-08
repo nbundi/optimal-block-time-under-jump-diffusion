@@ -6,7 +6,7 @@
 %  Blockchain Economy, Cyprus, 16-18 September 2026.
 %
 %  Slot: 15-17 minutes of talk plus 3-5 minutes of Q&A. The main deck is
-%  16 content slides, roughly a minute each; everything cut to fit lives
+%  17 content slides, roughly a minute each; everything cut to fit lives
 %  after \appendix as backup slides for the discussion.
 %
 %  Build:  make        (or: pdflatex talk && pdflatex talk)
@@ -169,6 +169,10 @@
     for arbitrary $\nu$; Proposition~1 and Theorem~3 need symmetry.
   \end{block}
 \end{frame}
+
+\figureslide[The pool--reference log gap $z_t = \log(S_t/P_t)$. Diffusive
+exceedances (teal) scale with $\sigma\sqrt{\dt}$; a jump (orange) opens a
+$\dt$-independent gap.]{What the model looks like}{fig_mispricing_path}
 
 \begin{frame}{Theorem 1 --- the zero-fee decomposition}
   In the continuous-arbitrage limit ($\gamma=0$, $\dt\to0$), $P_t \equiv S_t$
@@ -468,10 +472,6 @@ runs $0.2$--$15$~s; the jump parameters move it not at all.]%
           0.583$ in place of $1/\sqrt2$, and move $\dt^{\mathrm{opt}}$ by $5\%$.
   \end{itemize}
 \end{frame}
-
-\figureslide[Diffusive exceedances (teal) scale with $\sigma\sqrt{\dt}$; a jump
-(orange) opens a $\dt$-independent gap, cleared in full at the next block.]%
-{A sample path of the mispricing $z_t$}{fig_mispricing_path}
 
 \begin{frame}{Fees split LVR --- they do not reduce it}
   In the accounting of Milionis et al., arbitrage profit and fee income sum to

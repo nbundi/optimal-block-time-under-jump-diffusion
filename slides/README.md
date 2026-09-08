@@ -14,11 +14,11 @@ advertises a 30-minute slot covering presentation and Q&A; the organisers' 15–
 binding number and is what this deck is built for. That guide is still the source for the practical
 details: slides in `.pptx` or PDF, brought on a USB drive or emailed to the organisers in advance.
 
-The main deck is therefore **16 content slides**, roughly a minute each, plus a title, four section
+The main deck is therefore **17 content slides**, roughly a minute each, plus a title, four section
 dividers and the two closing slides. Everything cut to fit lives after `\appendix` as **backup
-slides** — limitations, the mispricing sample path, the fee-split accounting, the two-discount
-figure, the (σ, λ) regime grid, the optimum's sensitivity tables, and the reset-to-zero pitfall —
-so the material is one page-forward away if a question calls for it.
+slides** — limitations, the fee-split accounting, the two-discount figure, the (σ, λ) regime grid,
+the optimum's sensitivity tables, and the reset-to-zero pitfall — so the material is one
+page-forward away if a question calls for it.
 
 ## Framing
 
@@ -46,7 +46,7 @@ Both figures are recomputed from `../code.py`, not transcribed.
 | `fig_rate_vs_dt.pdf` | The headline picture: the two channels of `ℓ₀(Δt)`, with the jump floor as a constant band |
 | `fig_discounts.pdf` | The two fee discounts — `F(κ)` collapsing against a flat `Ψ(γ/δ)` |
 | `fig_welfare.pdf` | `W(Δt) = ℓ₀(Δt) + c/Δt`, its optimum at 8.4 s and its flatness |
-| `fig_mispricing_path.pdf` | Copied from `../arxiv/`; the paper's Figure 1 |
+| `fig_mispricing_path.pdf` | Copied from `../arxiv/`; the paper's Figure 1, shown right after the setup slide |
 | `zhaw-theme.sty`, `zhaw_logo_*.png`, `zhaw_title_bg.jpg` | The [ZHAW beamer template](https://github.com/nbundi/zhaw-beamer-template), vendored so the folder is self-contained |
 
 ## Build
