@@ -55,15 +55,16 @@
 \begin{frame}{Two live conversations about how fast a chain should be}
   \begin{rwexample}[Arbitrum Research --- ``The power of faster blocks'' (Felten, May 2024)]
     ``Arbitrum's $250$ millisecond block time leads to \hl{$65\%$ lower
-    arbitrage loss} compared to a $2$ second block time.'' \\
-    The scaling comes from ``a standard model known as `LVR with fees','' in
-    which ``arbitrage extraction scales with the square root of the block
-    time.''
+    arbitrage loss} compared to a $2$ second block time.''
+    \blockmarker{\weblink{https://research.arbitrum.io/t/the-power-of-faster-blocks/9609}%
+      {research.arbitrum.io/t/the-power-of-faster-blocks/9609}}
   \end{rwexample}
   \begin{rwexample}[EIP-7782 ``Reduce Block Latency'' --- $12$ s $\to$ $6$ s, drafted for Glamsterdam]
     ``More frequent blocks \hl{decrease LVR} (Loss Versus Rebalancing), which
     improves the economics for liquidity providers. More liquidity means lower
     spreads.''
+    \blockmarker{\weblink{https://eips.ethereum.org/EIPS/eip-7782}%
+      {eips.ethereum.org/EIPS/eip-7782}}
   \end{rwexample}
   Both rest on the same result. Both, on the numbers below, overstate the gain
   --- by roughly a factor of two.
@@ -82,8 +83,9 @@
           the stationary probability that an arriving block offers a
           \emph{profitable} trade.
     \item $F(\kappa) \sim \sigma\sqrt{\dt}/(\sqrt2\gamma) \to 0$ as $\dt\to0$.
-          That $\sqrt{\dt}$ is the $65\%$ and the $30\%$ quoted above; and it
-          says shorter blocks mean less LVR, all the way down.
+          That $\sqrt{\dt}$ is where Arbitrum's $65\%$ comes from, and the
+          ${\sim}29\%$ implied by halving Ethereum's slot; and it says shorter
+          blocks mean less LVR, all the way down.
   \end{itemize}
   \begin{takeaway}[The deployed prescription]
     ``Shorten blocks.'' Solana at $400$~ms, Ethereum L2s at $2$~s, app-chains
