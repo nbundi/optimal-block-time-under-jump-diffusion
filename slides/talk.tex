@@ -120,28 +120,28 @@
   \end{columns}
 \end{frame}
 
-\begin{frame}{This talk in one line}
-  \begin{takeaway}[Result]
-    Under jump-diffusion the LVR rate splits into a diffusion channel the block
-    schedule governs and a jump channel it cannot touch. For symmetric jump
-    laws the second is an \hl{exact lower bound} --- a floor no block speed
-    breaches.
-  \end{takeaway}
-  \medskip
-
-  What follows:
+\begin{frame}{Contributions}
   \begin{enumerate}
-    \item A zero-fee decomposition (Theorem~1).
-    \item With fees and blocks: a separated rate plus a two-sided bounded
-          remainder (Theorem~2, Proposition~1).
-    \item The floor, exactly, and the $\sqrt{\dt}$ approach to it
-          (Theorem~3, Corollary~1).
-    \item The LP-side planner's optimum: a cubic, invariant in pool size and
-          in every jump parameter (Theorem~4).
-    \item ETH/USDT calibration: $471\bpyr$ at $12$~s against a floor of
-          $125$, optimum near $8$~s --- and the two opening claims become
-          \hl{$35\%$} and \hl{$14\%$}.
+    \item An \hl{additive LVR decomposition} under any finite-activity jump
+          law: the classical diffusion term $\sigma^2V/8$ plus a jump term
+          carrying no $\dt$ (Theorem~1).
+    \item A \hl{separated rate} with fees and discrete blocks,
+          $\ell_0 = \tfrac{\sigma^2V}{8}F(\kappa) + \lambda V G_\nu(\gamma)$ ---
+          the two channels meeting only in a remainder bounded on both sides,
+          with no order symbols (Theorem~2, Proposition~1).
+    \item An \hl{exact jump floor}: $\ell(\dt) \ge \lambda V G_\nu(\gamma) > 0$
+          at every $\dt$ for symmetric $\nu$, with no remainder, and approached
+          only as $\sqrt{\dt}$ (Theorem~3, Corollary~1).
+    \item A \hl{closed-form planner's optimum} --- a cubic, invariant in pool
+          size exactly and in $(\lambda,m,\delta)$ below the flatness of the
+          objective (Theorem~4), calibrated to ETH/USDT, 2020--2026.
   \end{enumerate}
+  \begin{takeaway}[Headline]
+    The block schedule governs one channel and cannot touch the other. At
+    Ethereum's $12$~s that is $471\bpyr$ against an exact floor of $125$, and
+    an LP-side optimum near $8$~s --- so the two proposals above are worth
+    \hl{$35\%$} and \hl{$14\%$}, not $65\%$ and $29\%$.
+  \end{takeaway}
 \end{frame}
 
 % =====================================================================
