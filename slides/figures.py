@@ -159,7 +159,70 @@ def fig_welfare(path="fig_welfare.pdf"):
     return path
 
 
+def fig_cpmm(path="fig_cpmm.pdf"):
+    """What a constant-product pool is: the invariant curve in reserve space.
+
+    Schematic, not calibrated: L = 1 and P0 = 1 are chosen for legibility, and
+    nothing here depends on the ETH/USDT numbers.  The slide uses this to make
+    three points -- reserves live on the curve, a trade is a move along it, and
+    the pool's price is the curve's slope, so the pool has no view of the
+    outside market until someone trades.
+
+    The deck scales this into a half-width column, so the figure carries its own
+    larger type; the deck's full-width figures do not.
+    """
+    L, P0, P1 = 1.0, 1.0, 2.7
+    x0, y0 = math.sqrt(L / P0), math.sqrt(L * P0)
+    x1, y1 = math.sqrt(L / P1), math.sqrt(L * P1)
+
+    rc = {"font.size": 17, "axes.labelsize": 17, "xtick.labelsize": 14,
+          "ytick.labelsize": 14}
+    with plt.rc_context(rc):
+        fig, ax = plt.subplots(figsize=(5.4, 3.7))
+
+        x = np.linspace(0.40, 2.3, 400)
+        ax.plot(x, L / x, color=BLUE, lw=3.0)
+
+        xseg = np.linspace(x1, x0, 80)                # the stretch a trade covers
+        ax.plot(xseg, L / xseg, color=RED, lw=4.6, solid_capstyle="round", zorder=4)
+        ax.annotate("", xy=(x1, y1), xytext=(xseg[8], L / xseg[8]),
+                    arrowprops=dict(arrowstyle="-|>", color=RED, lw=0,
+                                    mutation_scale=24))
+        ax.plot([x0], [y0], "o", color=NIGHT, ms=9, zorder=5)
+        ax.plot([x1], [y1], "o", color=RED, ms=9, zorder=5)
+
+        xt = np.linspace(0.55, 1.72, 2)               # tangent: slope -P0
+        ax.plot(xt, y0 - P0 * (xt - x0), color=GREY, lw=1.8, ls="--", zorder=3)
+
+        ax.annotate("a swap moves the\nreserves along the curve", xy=(x1, y1),
+                    xytext=(0.48, 2.42), fontsize=14.5, color=RED, linespacing=1.25,
+                    arrowprops=dict(arrowstyle="-", color=RED, lw=1.2,
+                                    shrinkA=6, shrinkB=4))
+        # just the slope: the slide's second bullet already says it is the price
+        ax.annotate("slope $=-P$", xy=(0.70, 1.30), xytext=(0.42, 0.62),
+                    fontsize=14.5, color=GREY, ha="left", va="center",
+                    arrowprops=dict(arrowstyle="-", color=GREY, lw=1.2,
+                                    shrinkA=8, shrinkB=3))
+
+        ax.set_xlabel("reserves of $X$")
+        ax.set_ylabel("reserves of $Y$")
+        xl = 2.18                                 # anchor on the curve itself
+        ax.annotate(r"$x_t\,y_t = L$", xy=(xl, L / xl), xytext=(1.66, 1.62),
+                    fontsize=18, color=BLUE, ha="center",
+                    arrowprops=dict(arrowstyle="-", color=BLUE, lw=1.2,
+                                    shrinkA=6, shrinkB=3))
+        ax.set_xticks([0.5, 1.0, 1.5, 2.0])
+        ax.set_yticks([0.5, 1.0, 1.5, 2.0])
+        ax.set_xlim(0.38, 2.35)
+        ax.set_ylim(0.25, 2.85)
+
+        fig.tight_layout()
+        fig.savefig(path)
+        plt.close(fig)
+    return path
+
+
 if __name__ == "__main__":
     here = os.path.dirname(os.path.abspath(__file__))
-    for fn in (fig_rate_vs_dt, fig_discounts, fig_welfare):
+    for fn in (fig_cpmm, fig_rate_vs_dt, fig_discounts, fig_welfare):
         print("wrote", fn(os.path.join(here, fn.__name__.replace("fig_", "fig_", 1) + ".pdf")))
